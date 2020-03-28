@@ -30,10 +30,10 @@ def convert_image(width, height, filebase, pixel, d, m):
     dmap = ""
     for y in range(0, (int)(height/(8*args.height))):
         for x in range(0, (int)(width/(8*args.width))):
-            for subx in range(1, args.width+1):
-                for suby in range(1, args.height+1):
+            for subx in range(0, args.width):
+                for suby in range(0, args.height):
                     # subx and suby go top to bottom and then left to right
-                    tile = convert_tile(x*subx, y*suby, pixel)
+                    tile = convert_tile(x*args.width+subx, y*args.height+suby, pixel)
                     if compress and (tile in mapper):
                         # use existing tile
                         dmap += "0x{0:02X}, ".format(mapper[tile])
@@ -68,22 +68,18 @@ def main():
     global mapcounter
     mapcounter = 0
     # dimension of meta tiles
-    width = 1
-    height = 1
 
     parser = argparse.ArgumentParser()
     parser.add_argument('image', metavar='image.png', nargs='+',help='8bit PNG image')
-    parser.add_argument("--uncompressed", default="no", help="Allow duplicate tiles")
+    parser.add_argument("--uncompressed", "-u", default="no", help="Allow duplicate tiles")
     parser.add_argument("--width", type=int, default=1, help="Meta tile width")
     parser.add_argument("--height", type=int, default=1, help="Meta tile height")
-    parser.add_argument("-o", default="", help="Base name for output files (default: derived from image name)")
+    parser.add_argument("--output", "-o", default="", help="Base name for output files (default: derived from image name)")
     global args
 
     args = parser.parse_args()
     if args.uncompressed != "no":
         compress = False
-    width = args.width
-    height = args.height
 
     for filename in args.image:
         if filename.split('.')[-1] != 'png':
@@ -93,18 +89,18 @@ def main():
     # base name for output files
     outbase = args.image[0][:-4]
 
-    if args.o != "":
-        outbase = args.o
-        if args.o.split('.')[-1] == 'png':
-            outbase = args.o[:-4]
-        if args.o.split('.')[-1] == 'c':
-            outbase = args.o[:-2]
-        if args.o[-7:] == '_data.c':
-            outbase = args.o[:-7]
-        if args.o[-6:] == '_map.c':
-            outbase = args.o[:-6]
-        if args.o[-6:] == '_pal.c':
-            outbase = args.o[:-6]
+    if args.output != "":
+        outbase = args.output
+        if args.output.split('.')[-1] == 'png':
+            outbase = args.output[:-4]
+        if args.output.split('.')[-1] == 'c':
+            outbase = args.output[:-2]
+        if args.output[-7:] == '_data.c':
+            outbase = args.output[:-7]
+        if args.output[-6:] == '_map.c':
+            outbase = args.output[:-6]
+        if args.output[-6:] == '_pal.c':
+            outbase = args.output[:-6]
     
     d = open(outbase + '_data.c', 'w')
     d.write("const unsigned char {0}_data[] = ".format(os.path.basename(outbase))+"{\n")
@@ -118,9 +114,9 @@ def main():
         r=png.Reader(filename=filename)
         original = r.read()
 
-        if original[0]%(8*height) != 0 or original[1]%(8*width) != 0:
-            print("Image height must be a multiple of {0}".format(8*height), file=sys.stderr)
-            print("Image width must be a multiple of {0}".format(8*width), file=sys.stderr)
+        if original[0]%(8*args.height) != 0 or original[1]%(8*args.width) != 0:
+            print("Image height must be a multiple of {0}".format(8*args.height), file=sys.stderr)
+            print("Image width must be a multiple of {0}".format(8*args.width), file=sys.stderr)
             exit(2)
 
         convert_image(original[0], original[1], outbase, list(original[2]), d, m)
