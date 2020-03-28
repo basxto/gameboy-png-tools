@@ -107,7 +107,7 @@ def main():
     m = open(outbase + '_map.c', 'w')
     m.write("const unsigned char {0}_map[] = ".format(os.path.basename(outbase))+"{\n\t")
     p = open(outbase + '_pal.c', 'w')
-    p.write("const UWORD {0}_pal[][] = ".format(os.path.basename(outbase)) + "{{\n\t")
+    p.write("const UWORD {0}_pal[][4] = ".format(os.path.basename(outbase)) + "{{\n\t")
 
     for filename in args.image:
         # read original image
@@ -122,14 +122,14 @@ def main():
         convert_image(original[0], original[1], outbase, list(original[2]), d, m)
 
         convert_palette(original[3]['palette'], outbase, p)
-    #d.seek(d.tell() - 2, 0)
+    d.seek(d.tell() - 3, 0)
     d.write("\n};")
     d.close()
-    #m.seek(m.tell() - 1, 0)
+    m.seek(m.tell() - 2, 0)
     m.write("\n};")
     m.close()
     p.seek(p.tell() - 4, 0)
-    p.write("; ")
+    p.write("};")
     p.close()
 
 
