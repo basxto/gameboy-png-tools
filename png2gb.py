@@ -35,16 +35,20 @@ def convert_image(width, height, filebase, pixel, d, m):
                 for suby in range(0, args.height):
                     # subx and suby go top to bottom and then left to right
                     tile = convert_tile(x*args.width+subx, y*args.height+suby, pixel)
-                    mapsize += 1
                     if compress and (tile in mapper):
                         # use existing tile
-                        dmap += "0x{0:02X}, ".format(mapper[tile])
+                        if(mapcounter < args.limit):
+                            dmap += "0x{0:02X}, ".format(mapper[tile])
                     else:
                         # add new tile
-                        data += "\t" + tile + "\n"
+                        if(mapcounter < args.limit):
+                            data += "\t" + tile + "\n"
                         mapper[tile] = mapcounter
-                        dmap += "0x{0:02X}, ".format(mapcounter)
+                        if(mapcounter < args.limit):
+                            dmap += "0x{0:02X}, ".format(mapcounter)
                         mapcounter += 1
+                    
+                    mapsize += 1
     d.write(data)
     m.write(dmap)
 
@@ -82,6 +86,7 @@ def main():
     parser.add_argument("--datarom", "-r", default="", help="Address within the ROM, data should be placed at")
     parser.add_argument("--maprom", "-m", default="", help="Address within the ROM, map should be placed at")
     parser.add_argument("--palrom", "-p", default="", help="Address within the ROM, palette should be placed at")
+    parser.add_argument("--limit", type=int, default=255, help="Maximum of tiles to put into data")
     global args
 
     args = parser.parse_args()
@@ -146,11 +151,14 @@ def main():
     m.seek(m.tell() - 2, 0)
     m.write("\n};")
     m.write("\n// {0} tiles".format(mapsize))
-    m.write("\n// 0x{0:02X} bytes".format(mapcounter))
+    m.write("\n// 0x{0:02X} bytes".format(mapsize))
     m.close()
     p.seek(p.tell() - 4, 0)
     p.write("};")
     p.close()
+
+    if(mapcounter >= args.limit):
+        print("Warning: Too many unique tiles in tileset: {0}".format(mapcounter+1))
 
 
 main()
