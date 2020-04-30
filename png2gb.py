@@ -22,58 +22,95 @@ def convert_tile(x, y, pixel):
                 lobyte=0
     return tile
 
-# broken
+# broken => does not work with overworld_a and cave
+# 0x00-0x7F verbatim
+# 0x80-BF run
+# 0xC0-FF alternating run
 def compress_rle(data):
     global datasize
-    datasize = 0
+    #datasize = 0 ???
     # clean up
     data = data.replace("\n","").replace("\t","")[:-2]
     # convert to array
     data = data.split(", ")
-
     output = []
-
     verbatim = []
-    byte = ""
-    counter = 0
-    for d in data:
-        if byte == d:
-            counter+=1
+    # first character has run of 1
+    counter = 1
+    mode = 0
+
+    # we skip first
+    for i in range(1,len(data)):
+        # same char => it's a run
+        if mode == 0 and data[i-1] == data[i]:
+            counter += 1
             if len(verbatim) != 0:
-                if len(verbatim) > 255:
-                    print("Oh oh {0}".format(len(verbatim)))
                 output.append("(0x{0:02X})".format(len(verbatim)-1))
                 output += verbatim
                 datasize += 1+len(verbatim)
                 del verbatim[:]
+            #TODO: jump to alternating mode
+            # maximum counter reached
+            if counter == 127:
+                output.append("(0x{0:02X})".format(0x80 | (counter-2)))
+                output.append(data[i-1])
+                datasize += 2
+                counter = 1
+        # alternating bytes
+        elif mode == 1 and data[i-3] == data[i-1] and data[i-2] == data[i]:
+            counter += 1
+            i += 1
+        # we have a new char => write run
         elif counter > 1:
-            # 0x80 is twice, since 0x00 handles once
-            output.append("(0x{0:02X})".format(0x80 | (counter-2)))
-            output.append(byte)
-            datasize += 2
-            byte = d
+            if mode == 0:
+                output.append("(0x{0:02X})".format(0x80 | (counter-2)))
+                output.append(data[i-1])
+                datasize += 2
+            else:
+                output.append("(0x{0:02X})".format(0xC0 | (counter-2)))
+                output.append(data[i-2])
+                output.append(data[i-1])
+                datasize += 3
+            mode = 0
             counter = 1
+        # verbatim buffer is full
+        elif len(verbatim) == 255:
+            output.append("(0x{0:02X})".format(len(verbatim)-1))
+            output += verbatim
+            datasize += 1+len(verbatim)
+            del verbatim[:]
+        # TODO: enable entry point for alternating run
+        # check whether this is alternating
+        """ elif len(verbatim) == 3:
+            if mode == 0 and data[i-3] == data[i-1] and data[i-2] == data[i]:
+                del verbatim[:]
+                print("Alternating run")
+                counter = 2
+                mode = 1
+            else:
+                verbatim.append(data[i-1])
+                counter = 1 """
         elif counter == 1:
-            verbatim.append(byte)
-            byte = d
+            verbatim.append(data[i-1])
             counter = 1
-        else:
-            byte = d
-            counter = 1
+    # handle last element
     if counter > 1:
-        if counter > 255:
-            print("Ah oh {0}".format(counter))
-        output.append("(0x{0:02X})".format(0x80 | (counter-1)))
-        output.append(byte)
-        datasize += 2
-    elif counter == 1:
-        #verbatim length 1
-        output.append("(0x00)")
-        output.append(byte)
-        datasize += 2
-    # end of compression
-    output.append("(0xFF)")
-
+        if mode == 0:
+            output.append("(0x{0:02X})".format(0x80 | (counter-2)))
+            output.append(data[len(data)-1])
+            datasize += 2
+        else:
+            output.append("(0x{0:02X})".format(0xC0 | (counter-2)))
+            output.append(data[len(data)-2])
+            output.append(data[len(data)-1])
+            datasize += 3
+    else:
+        verbatim.append(data[len(data)-1])
+    if len(verbatim) > 0:
+        output.append("(0x{0:02X})".format(len(verbatim)-1))
+        output += verbatim
+        datasize += 1+len(verbatim)
+    # format output
     formatted_output = ""
     counter = 0
     for o in output:
@@ -81,7 +118,6 @@ def compress_rle(data):
             formatted_output += "\n\t"
         formatted_output += "{0}, ".format(o)
         counter = (counter + 1) % 16
-
     return formatted_output[1:] + "\n"
 
 def convert_image(width, height, filebase, pixel, d, m):
@@ -114,10 +150,10 @@ def convert_image(width, height, filebase, pixel, d, m):
                         mapcounter += 1
                     
                     mapsize += 1
-    #if args.compress_rle != "no":
-    #    print("Before compression: 0x{0:02X} bytes".format(datasize))
-    #    data = compress_rle(data)
-    #    print("After compression: 0x{0:02X} bytes".format(datasize))
+    if args.compress_rle != "no":
+        print("Before compression: 0x{0:02X} bytes".format(datasize))
+        data = compress_rle(data)
+        print("After compression: 0x{0:02X} bytes".format(datasize))
     d.write(data)
     m.write(dmap)
 
@@ -159,7 +195,7 @@ def main():
     parser.add_argument("--maprom", "-m", default="", help="Address within the ROM, map should be placed at")
     parser.add_argument("--palrom", "-p", default="", help="Address within the ROM, palette should be placed at")
     parser.add_argument("--limit", type=int, default=255, help="Maximum of tiles to put into data")
-    #parser.add_argument("--compress-rle", "-c", default="no", help="Additionally compress data with a simple RLE algorithm")
+    parser.add_argument("--compress-rle", "-c", default="no", help="Additionally compress data with a simple RLE algorithm")
     global args
 
     args = parser.parse_args()
@@ -189,8 +225,8 @@ def main():
     
     d = open(outbase + '_data.c', 'w')
     d.write("// Generated by png2gb.py\n")
-    #if args.compress_rle != "no":
-    #    d.write("// Compressed with RLE\n")
+    if args.compress_rle != "no":
+        d.write("// Compressed with RLE\n")
     if args.datarom != "":
         d.write("__at ({0}) ".format(args.datarom))
     d.write("const unsigned char {0}_data[] = ".format(os.path.basename(outbase))+"{\n")
@@ -219,6 +255,10 @@ def main():
         dataaccu += datasize
 
         convert_palette(original[3]['palette'], outbase, p)
+    if args.compress_rle != "no":
+        # end of compression
+        d.write("\t(0xFF),\n\t")
+        dataaccu+=1;
     d.seek(d.tell() - 3, 0)
     d.write("\n};")
     d.write("\n// {0} tiles".format(mapcounter))
