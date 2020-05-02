@@ -25,19 +25,19 @@ def convert_tile(x, y, pixel):
 # new idea:
 # 2 bytes don’t have to be repeated more than 16 times (2 tiles)
 # one byte doesn’t have to run more than 32 times (2 tiles)
-# 0XXXXXXX - write through the next X bytes (127+1)
-# 100XXXXX - run next byte X times (31+2) - highest and lowest color only
-# 101XXXXX - run next byte X times alternating inverted and normal (31+2) - middle colors only
-# 110XXXXX - run next 2 bytes X times alternating (31+2)
-# 11011111 - end of data
-# 111XXXHL - High Low colored line X times (7+1)
+# 00 0XXXXXXX - write through the next X bytes (127+1)
+# 80 100XXXXX - run next byte X times (31+2) - highest and lowest color only
+# A0 101XXXXX - run next byte X times alternating normal and inverted  (31+2) - middle colors only
+# C0 110HLXXX - High Low colored line X times (7+1)
+# E0 111XXXXX - run next 2 bytes X times alternating (30+2)
+# FF 11111111 - end of data
 
-# 1111 1111 represents 8 times 0xFF 0xFF, which are 16 bytes
+# 1101 1111 represents 8 times 0xFF 0xFF, which are 16 bytes
 
 # current:
 # 0XXXXXXX - write through the next X bytes (127+1)
-# 10XXXXXX - run next byte X times (63+2) - highest and lowest color only
-# 11XXXXXX - run next 2 bytes X times alternating (63+2) - duplicate row
+# 100XXXXX - run next byte X times (63+2) - highest and lowest color only
+# 111XXXXX - run next 2 bytes X times alternating (63+2) - duplicate row
 # 11111111 - end of data
 
 def compress_rle(data):
@@ -89,15 +89,15 @@ def compress_rle(data):
             # run of alternating two bytes
             counter += 1
             # maximum counter reached
-            if counter == (0x1F + 3) or i == (len(data) - 2):
+            if counter == (0x1E + 3) or i == (len(data) - 2):
                 append = False
-                if counter > (0x1F + 2):
+                if counter > (0x1E + 2):
                     # only put current bytes into run if it's last run
                     # and there is still place
                     counter -= 1
                     append = True
                 if(counter > 1):
-                    output.append("( 0x{0:02X} )".format(0xC0 | (counter-2)))
+                    output.append("( 0x{0:02X} )".format(0xE0 | (counter-2)))
                     output.append(data[i-2])
                     output.append(data[i-1])
                     datasize += 3
@@ -115,7 +115,7 @@ def compress_rle(data):
                 output.append(data[i-1])
                 datasize += 2
             else:
-                output.append("(0x{0:02X})".format(0xC0 | (counter-2)))
+                output.append("(0x{0:02X})".format(0xE0 | (counter-2)))
                 output.append(data[i-2])
                 output.append(data[i-1])
                 datasize += 3
