@@ -22,46 +22,94 @@ def convert_tile(x, y, pixel):
                 lobyte=0
     return tile
 
-# broken => does not work with overworld_a and cave
-# 0x00-0x7F verbatim
-# 0x80-BF run
-# 0xC0-FF alternating run
+# new idea:
+# 2 bytes don’t have to be repeated more than 16 times (2 tiles)
+# one byte doesn’t have to run more than 32 times (2 tiles)
+# 0XXXXXXX - write through the next X bytes (127+1)
+# 100XXXXX - run next byte X times (31+2) - highest and lowest color only
+# 101XXXXX - run next byte X times alternating inverted and normal (31+2) - middle colors only
+# 110XXXXX - run next 2 bytes X times alternating (31+2)
+# 11011111 - end of data
+# 111XXXHL - High Low colored line X times (7+1)
+
+# 1111 1111 represents 8 times 0xFF 0xFF, which are 16 bytes
+
+# current:
+# 0XXXXXXX - write through the next X bytes (127+1)
+# 10XXXXXX - run next byte X times (63+2) - highest and lowest color only
+# 11XXXXXX - run next 2 bytes X times alternating (63+2) - duplicate row
+# 11111111 - end of data
+
+# TODO double byte mode missing
 def compress_rle(data):
     global datasize
-    #datasize = 0 ???
+    # we calculate new compressed datasize
+    datasize = 0
     # clean up
     data = data.replace("\n","").replace("\t","")[:-2]
     # convert to array
     data = data.split(", ")
     output = []
-    verbatim = []
+    verbatim = [data[0]]
+    # 0 is one byte and 1 is 2 bytes
+    mode = 0 
     # first character has run of 1
     counter = 1
-    mode = 0
-
-    # we skip first
+    # first character is already in verbatim buffer
+    # we basically handle byte from last round
     for i in range(1,len(data)):
-        # same char => it's a run
         if mode == 0 and data[i-1] == data[i]:
+            # run
             counter += 1
-            if len(verbatim) != 0:
-                output.append("(0x{0:02X})".format(len(verbatim)-1))
+            # delete data[i-1] from array since it's in our run
+            if len(verbatim) > 0:
+                del verbatim[-1:]
+            # flush verbatim buffer
+            if len(verbatim) > 0:
+                output.append("( 0x{0:02X})".format(len(verbatim)-1))
                 output += verbatim
                 datasize += 1+len(verbatim)
                 del verbatim[:]
-            #TODO: jump to alternating mode
             # maximum counter reached
-            if counter == 127:
-                output.append("(0x{0:02X})".format(0x80 | (counter-2)))
-                output.append(data[i-1])
-                datasize += 2
+            if counter == (0x1F + 3) or i == (len(data) - 1):
+                append = False
+                if counter > (0x1F + 2):
+                    # only put current byte into run if it's last run
+                    # and there is still place
+                    counter -= 1
+                    append = True
+                if(counter > 1):
+                    output.append("( 0x{0:02X} )".format(0x80 | (counter-2)))
+                    output.append(data[i])
+                    datasize += 2
+                if append:
+                    verbatim.append(data[i])
                 counter = 1
-        # alternating bytes
-        elif mode == 1 and data[i-3] == data[i-1] and data[i-2] == data[i]:
+        elif mode == 1 and (i+1) < len(data) and data[i-2] == data[i] and data[i-1] == data[i+1]:
+            # run of alternating two bytes
             counter += 1
-            i += 1
-        # we have a new char => write run
+            # maximum counter reached
+            if counter == (0x1F + 3) or i == (len(data) - 2):
+                append = False
+                if counter > (0x1F + 2):
+                    # only put current bytes into run if it's last run
+                    # and there is still place
+                    counter -= 1
+                    append = True
+                if(counter > 1):
+                    output.append("( 0x{0:02X} )".format(0xC0 | (counter-2)))
+                    output.append(data[i-2])
+                    output.append(data[i-1])
+                    datasize += 3
+                if append:
+                    verbatim.append(data[i])
+                    verbatim.append(data[i+1])
+                counter = 1
+                mode = 0
+            # since we handled two bytes
+            i+=1
         elif counter > 1:
+            # run just ended
             if mode == 0:
                 output.append("(0x{0:02X})".format(0x80 | (counter-2)))
                 output.append(data[i-1])
@@ -71,43 +119,34 @@ def compress_rle(data):
                 output.append(data[i-2])
                 output.append(data[i-1])
                 datasize += 3
-            mode = 0
+            verbatim.append(data[i])
             counter = 1
-        # verbatim buffer is full
-        elif len(verbatim) == 255:
-            output.append("(0x{0:02X})".format(len(verbatim)-1))
+            mode = 0
+        elif len(verbatim) == (0x7F + 1) or (len(verbatim) > 0 and i == (len(data) - 1)):
+            # flush full verbatim buffer
+            append = True
+            if i == (len(data) - 1) and len(verbatim) < (0x7F + 1):
+                # only do this if it still fits
+                verbatim.append(data[i])
+                append = False
+            output.append("(0x{0:02X} )".format(len(verbatim)-1))
             output += verbatim
             datasize += 1+len(verbatim)
             del verbatim[:]
-        # TODO: enable entry point for alternating run
-        # check whether this is alternating
-        """ elif len(verbatim) == 3:
-            if mode == 0 and data[i-3] == data[i-1] and data[i-2] == data[i]:
-                del verbatim[:]
-                print("Alternating run")
-                counter = 2
-                mode = 1
-            else:
-                verbatim.append(data[i-1])
-                counter = 1 """
-        elif counter == 1:
-            verbatim.append(data[i-1])
+            if append:
+                verbatim.append(data[i])
             counter = 1
-    # handle last element
-    if counter > 1:
-        if mode == 0:
-            output.append("(0x{0:02X})".format(0x80 | (counter-2)))
-            output.append(data[len(data)-1])
-            datasize += 2
+        #elif len(verbatim) == 3 and mode == 0 and data[i-3] == data[i-1] and data[i-2] == data[i]:
+        #    del verbatim[:]
+        #    print("Alternating run")
+        #    counter = 2
+        #    mode = 1
         else:
-            output.append("(0x{0:02X})".format(0xC0 | (counter-2)))
-            output.append(data[len(data)-2])
-            output.append(data[len(data)-1])
-            datasize += 3
-    else:
-        verbatim.append(data[len(data)-1])
+            verbatim.append(data[i])
+            counter = 1
+    # last byte
     if len(verbatim) > 0:
-        output.append("(0x{0:02X})".format(len(verbatim)-1))
+        output.append("(  0x{0:02X}  )".format(len(verbatim)-1))
         output += verbatim
         datasize += 1+len(verbatim)
     # format output
