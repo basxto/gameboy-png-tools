@@ -1,13 +1,11 @@
 // complementary decompressor for png2gb.py
-#include <gb/gb.h>
+#include "decompress.h"
 // for debug output
 #include "../../../hud.h"
 
 unsigned char decompress_tile_buffer[16];
 
-#define set_bkg_data_rle set_win_data_rle
-
-// broken
+// TODO: allow to skip bytes
 void set_bkg_data_rle(UINT8 first_tile, UINT8 nb_tiles, unsigned char *data) NONBANKED{
     UINT16 counter = 0;
     UINT8 index = 0;

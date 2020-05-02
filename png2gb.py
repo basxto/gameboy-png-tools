@@ -40,7 +40,6 @@ def convert_tile(x, y, pixel):
 # 11XXXXXX - run next 2 bytes X times alternating (63+2) - duplicate row
 # 11111111 - end of data
 
-# TODO double byte mode missing
 def compress_rle(data):
     global datasize
     # we calculate new compressed datasize
@@ -57,7 +56,8 @@ def compress_rle(data):
     counter = 1
     # first character is already in verbatim buffer
     # we basically handle byte from last round
-    for i in range(1,len(data)):
+    i = 1
+    while i < len(data):
         if mode == 0 and data[i-1] == data[i]:
             # run
             counter += 1
@@ -136,14 +136,19 @@ def compress_rle(data):
             if append:
                 verbatim.append(data[i])
             counter = 1
-        #elif len(verbatim) == 3 and mode == 0 and data[i-3] == data[i-1] and data[i-2] == data[i]:
-        #    del verbatim[:]
-        #    print("Alternating run")
-        #    counter = 2
-        #    mode = 1
+        elif len(verbatim) >= 3 and mode == 0 and data[i-3] == data[i-1] and data[i-2] == data[i]:
+            del verbatim[-3:]
+            if len(verbatim) > 0:
+                output.append("( 0x{0:02X})".format(len(verbatim)-1))
+                output += verbatim
+                datasize += 1+len(verbatim)
+                del verbatim[:]
+            counter = 2
+            mode = 1
         else:
             verbatim.append(data[i])
             counter = 1
+        i+=1
     # last byte
     if len(verbatim) > 0:
         output.append("(  0x{0:02X}  )".format(len(verbatim)-1))
