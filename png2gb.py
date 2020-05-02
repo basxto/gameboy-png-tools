@@ -22,6 +22,15 @@ def convert_tile(x, y, pixel):
                 lobyte=0
     return tile
 
+# totally new compression idea:
+# 0000000 end of data
+# 0000000 could also have special meaning like two row mode
+# -> next byte is a mask where 1 is the first common double byte and 0 is the second
+# XXXXXXX mask that indicates where the most common double byte (row) occurs
+# this is followed by the most common double byte
+# when mask bit is 1, write the common double byte, if it is 0 read another doube byte
+# it should be possible to quickly skip through this encoding tile-wise
+
 # new idea:
 # 2 bytes don’t have to be repeated more than 16 times (2 tiles)
 # one byte doesn’t have to run more than 32 times (2 tiles)
@@ -66,7 +75,7 @@ def compress_rle(data):
                 del verbatim[-1:]
             # flush verbatim buffer
             if len(verbatim) > 0:
-                output.append("( 0x{0:02X})".format(len(verbatim)-1))
+                output.append("( 0x{0:02X} )".format(len(verbatim)-1))
                 output += verbatim
                 datasize += 1+len(verbatim)
                 del verbatim[:]
@@ -97,10 +106,25 @@ def compress_rle(data):
                     counter -= 1
                     append = True
                 if(counter > 1):
-                    output.append("( 0x{0:02X} )".format(0xE0 | (counter-2)))
-                    output.append(data[i-2])
-                    output.append(data[i-1])
-                    datasize += 3
+                    if counter <= 8 and (data[i-2] == '0xFF' or data[i-2] == '0x00') and (data[i-1] == '0xFF' or data[i-1] == '0x00'):
+                        h = 0x0
+                        l = 0x0
+                        if data[i-2] == '0xFF':
+                            h = 0x10
+                        if data[i-1] == '0xFF':
+                            l = 0x08
+                        output.append("(0x{0:02X})".format(0xC0 | h | l | (int(counter)-1)))
+                        datasize += 1
+                    # only invert on a byte scale
+                    elif int(data[i-2],16) == (int(data[i-1],16)^0xFF):
+                        output.append("((0x{0:02X}))".format(0xA0 | (counter-2)))
+                        output.append(data[i-2])
+                        datasize += 2
+                    else:
+                        output.append("((0x{0:02X}))".format(0xE0 | (counter-2)))
+                        output.append(data[i-2])
+                        output.append(data[i-1])
+                        datasize += 3
                 if append:
                     verbatim.append(data[i])
                     verbatim.append(data[i+1])
@@ -111,14 +135,36 @@ def compress_rle(data):
         elif counter > 1:
             # run just ended
             if mode == 0:
-                output.append("(0x{0:02X})".format(0x80 | (counter-2)))
-                output.append(data[i-1])
-                datasize += 2
+                if(counter <= 8*2 and counter%2 == 0 and (data[i-1] == '0xFF' or data[i-1] == '0x00')):
+                    hl = 0x0
+                    if data[i-1] == '0xFF':
+                        hl = 0x18
+                    output.append("(0x{0:02X})".format(0xC0 | hl | (int(counter/2)-1)))
+                    datasize += 1
+                else:
+                    output.append("(0x{0:02X})".format(0x80 | (counter-2)))
+                    output.append(data[i-1])
+                    datasize += 2
             else:
-                output.append("(0x{0:02X})".format(0xE0 | (counter-2)))
-                output.append(data[i-2])
-                output.append(data[i-1])
-                datasize += 3
+                if counter <= 8 and (data[i-2] == '0xFF' or data[i-2] == '0x00') and (data[i-1] == '0xFF' or data[i-1] == '0x00'):
+                    #print("We could optimize this")
+                    h = 0x0
+                    l = 0x0
+                    if data[i-2] == '0xFF':
+                        h = 0x10
+                    if data[i-1] == '0xFF':
+                        l = 0x08
+                    output.append("(0x{0:02X})".format(0xC0 | h | l | (int(counter)-1)))
+                    datasize += 1
+                elif int(data[i-2],16) == (int(data[i-1],16)^0xFF):
+                    output.append("(0x{0:02X})".format(0xA0 | (counter-2)))
+                    output.append(data[i-2])
+                    datasize += 2
+                else:
+                    output.append("(0x{0:02X})".format(0xE0 | (counter-2)))
+                    output.append(data[i-2])
+                    output.append(data[i-1])
+                    datasize += 3
             verbatim.append(data[i])
             counter = 1
             mode = 0

@@ -51,21 +51,45 @@ void set_bkg_data_rle(UINT8 first_tile, UINT8 nb_tiles, unsigned char *data) NON
             // value part
             value = cmd & 0x1F;
             // command part
-            cmd = cmd & 0xE0;
+            cmd &= 0xE0;
             switch(cmd){
-                case 0xE0:
-                    // double run
-                    byte1 = data[counter++];
-                    byte2 = data[counter++];
+                case 0x80:
+                    // run
+                    byte1 = byte2 = data[counter++];
                     // 0 counts as twice
+                    value += 2;
+                    break;
+                case 0xA0:
+                    // double inverted run
+                    byte1 = data[counter];
+                    byte2 = ~data[counter++];
                     value += 2;
                     // amount for was for 2 bytes
                     value *= 2;
                     break;
-                case 0x80:
-                    // run
-                    byte1 = byte2 = data[counter++];
+                case 0xC0:
+                    // double inverted run
+                    if(value & 0x10)
+                        byte1 = 0xFF;
+                    else
+                        byte1 = 0x00;
+                    if(value & 0x8)
+                        byte2 = 0xFF;
+                    else
+                        byte2 = 0x00;
+                    // remove H and L bit
+                    value &= 0x7;
+                    // 0 counts as once
+                    value += 1;
+                    // amount for was for 2 bytes
+                    value *= 2;
+                    break;
+                case 0xE0:
+                    // double run
+                    byte1 = data[counter++];
+                    byte2 = data[counter++];
                     value += 2;
+                    value *= 2;
                     break;
             }
             for(i = 0; i < value; ++i){
