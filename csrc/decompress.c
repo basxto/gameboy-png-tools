@@ -6,14 +6,15 @@ unsigned char decompress_tile_buffer[16];
 // 2 bytes don’t have to be repeated more than 16 times (2 tiles)
 // one byte doesn’t have to run more than 32 times (2 tiles)
 // 00 0XXXXXXX - write through the next X bytes (127+1)
-// 80 100XXXXX - run next byte X times (31+2) - highest and lowest color only
+// 80 100XXXXX - run next byte X*2 times (31+2) - highest and lowest color only
 // A0 101XXXXX - run next byte X times alternating normal and inverted  (31+2) - middle colors only
 // C0 110HLXXX - High Low colored line X times (7+1)
 // E0 111XXXXX - run next 2 bytes X times alternating (30+2)
 // FF 11111111 - end of data
 
+// this can't load into sprite VRAM < index 128
 // TODO: allow to skip bytes
-void set_bkg_data_rle(UINT8 first_tile, UINT8 nb_tiles, unsigned char *data) NONBANKED{
+unsigned char* set_bkg_data_rle(UINT8 first_tile, UINT8 nb_tiles, unsigned char *data) NONBANKED{
     UINT16 counter = 0;
     UINT8 index = 0;
     UINT8 position = 0;
@@ -25,17 +26,18 @@ void set_bkg_data_rle(UINT8 first_tile, UINT8 nb_tiles, unsigned char *data) NON
         cmd = data[counter++];
         // end of compression
         if(cmd == 0xFF){
-            return;
+            return 0;
         }else if((cmd & 0x80) == 0){
             //verbatim
             // cmd is amount; 0 is once
             for(++cmd; cmd != 0; --cmd){
                 decompress_tile_buffer[index] = data[counter++];
                 if(++index == 16){
-                    set_bkg_data(first_tile + position, 1, decompress_tile_buffer);
+                    if(first_tile != 0xFF)
+                        set_bkg_data(first_tile + position, 1, decompress_tile_buffer);
                     index = 0;
                     if(++position >= nb_tiles)
-                        return;
+                        return decompress_tile_buffer;
                 }
             }
         }else{
@@ -75,10 +77,11 @@ void set_bkg_data_rle(UINT8 first_tile, UINT8 nb_tiles, unsigned char *data) NON
             for(; value != 0; --value){
                 decompress_tile_buffer[index] = (value%2 == 0 ? byte1 : byte2);
                 if(++index == 16){
-                    set_bkg_data(first_tile + position, 1, decompress_tile_buffer);
+                    if(first_tile != 0xFF)
+                        set_bkg_data(first_tile + position, 1, decompress_tile_buffer);
                     index = 0;
                     if(++position >= nb_tiles)
-                        return;
+                        return decompress_tile_buffer;
                 }
             }
         }
