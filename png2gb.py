@@ -22,6 +22,25 @@ def convert_tile(x, y, pixel):
                 lobyte=0
     return tile
 
+# helper function for compress_rle
+def flush_verbatim(verbatim, output):
+    global datasize
+    if(len(verbatim) == 2 and (verbatim[0] == '0xFF' or verbatim[0] == '0x00') and (verbatim[1] == '0xFF' or verbatim[1] == '0x00')):
+        # 1 byte instead of 3
+        h = 0x0
+        l = 0x0
+        if verbatim[0] == '0xFF':
+            h = 0x10
+        if verbatim[1] == '0xFF':
+            l = 0x08
+        output.append("(0x{0:02X})".format(0xC0 | h | l | 0))
+        datasize += 1
+    else:
+        output.append("(0x{0:02X})".format(len(verbatim)-1))
+        output += verbatim
+        datasize += 1+len(verbatim)
+    return output
+
 # totally new compression idea:
 # 0000000 end of data
 # 0000000 could also have special meaning like two row mode
@@ -69,9 +88,7 @@ def compress_rle(data):
                 del verbatim[-1:]
             # flush verbatim buffer
             if len(verbatim) > 0:
-                output.append("( 0x{0:02X} )".format(len(verbatim)-1))
-                output += verbatim
-                datasize += 1+len(verbatim)
+                output = flush_verbatim(verbatim, output)
                 del verbatim[:]
             if i == (len(data) - 1):
                 # handle last iteration
@@ -127,7 +144,8 @@ def compress_rle(data):
                         datasize += 3
                 if append:
                     verbatim.append(data[i])
-                    verbatim.append(data[i+1])
+                    # jump back by one, we don't wanna put two here
+                    i-=1
                 counter = 1
                 mode = 0
             # since we handled two bytes
@@ -175,9 +193,7 @@ def compress_rle(data):
                 # only do this if it still fits
                 verbatim.append(data[i])
                 append = False
-            output.append("(0x{0:02X} )".format(len(verbatim)-1))
-            output += verbatim
-            datasize += 1+len(verbatim)
+            output = flush_verbatim(verbatim, output)
             del verbatim[:]
             if append:
                 verbatim.append(data[i])
@@ -185,9 +201,7 @@ def compress_rle(data):
         elif len(verbatim) >= 3 and mode == 0 and data[i-3] == data[i-1] and data[i-2] == data[i]:
             del verbatim[-3:]
             if len(verbatim) > 0:
-                output.append("( 0x{0:02X})".format(len(verbatim)-1))
-                output += verbatim
-                datasize += 1+len(verbatim)
+                output = flush_verbatim(verbatim, output)
                 del verbatim[:]
             counter = 2
             mode = 1
@@ -197,9 +211,7 @@ def compress_rle(data):
         i+=1
     # last byte
     if len(verbatim) > 0:
-        output.append("(  0x{0:02X}  )".format(len(verbatim)-1))
-        output += verbatim
-        datasize += 1+len(verbatim)
+        output = flush_verbatim(verbatim, output)
     # format output
     formatted_output = ""
     counter = 0
