@@ -1,7 +1,5 @@
 // complementary decompressor for png2gb.py
 #include "decompress.h"
-// for debug output
-#include "../../../hud.h"
 
 unsigned char decompress_tile_buffer[16];
 
@@ -23,27 +21,20 @@ void set_bkg_data_rle(UINT8 first_tile, UINT8 nb_tiles, unsigned char *data) NON
     UINT8 value;
     UINT8 byte1;
     UINT8 byte2;
-    UINT8 i;
     while(1){
-        cmd = data[counter];
-        ++counter;
+        cmd = data[counter++];
         // end of compression
         if(cmd == 0xFF){
-            //continue;
-            write_hex(12, 0, 2, position);
-            write_hex(12, 1, 2, counter>>8);
-            write_hex(14, 1, 2, counter&0xFF);
             return;
         }else if((cmd & 0x80) == 0){
             //verbatim
-            ++cmd;// 0 is once
-            for(i = 0; i < cmd; ++i){
-                decompress_tile_buffer[index++] = data[counter++];
-                if(index == 16){
+            // cmd is amount; 0 is once
+            for(++cmd; cmd != 0; --cmd){
+                decompress_tile_buffer[index] = data[counter++];
+                if(++index == 16){
                     set_bkg_data(first_tile + position, 1, decompress_tile_buffer);
-                    ++position;
                     index = 0;
-                    if(position >= nb_tiles)
+                    if(++position >= nb_tiles)
                         return;
                 }
             }
@@ -59,49 +50,34 @@ void set_bkg_data_rle(UINT8 first_tile, UINT8 nb_tiles, unsigned char *data) NON
                     // 0 counts as twice
                     value += 2;
                     break;
-                case 0xA0:
-                    // double inverted run
-                    byte1 = data[counter];
-                    byte2 = ~data[counter++];
-                    value += 2;
-                    // amount for was for 2 bytes
-                    value *= 2;
-                    break;
                 case 0xC0:
                     // double inverted run
-                    if(value & 0x10)
-                        byte1 = 0xFF;
-                    else
-                        byte1 = 0x00;
-                    if(value & 0x8)
-                        byte2 = 0xFF;
-                    else
-                        byte2 = 0x00;
+                    byte1 = (value & 0x10 ? 0xFF : 0x00);
+                    byte2 = (value & 0x8 ? 0xFF : 0x00);
                     // remove H and L bit
-                    value &= 0x7;
                     // 0 counts as once
-                    value += 1;
                     // amount for was for 2 bytes
-                    value *= 2;
+                    value = ((value&0x7) + 1)*2;
                     break;
-                case 0xE0:
-                    // double run
+                default:
+                    // inverted and double run
                     byte1 = data[counter++];
-                    byte2 = data[counter++];
-                    value += 2;
-                    value *= 2;
+                    byte2 = ~byte1;
+                    if(cmd == 0xE0){
+                        // for double run
+                        byte2 = data[counter++];
+                    }
+                    // 0 counts as twice
+                    // amount for was for 2 bytes
+                    value = (value + 2)*2;
                     break;
             }
-            for(i = 0; i < value; ++i){
-                if(i%2 == 0)
-                    decompress_tile_buffer[index++] = byte1;
-                else
-                    decompress_tile_buffer[index++] = byte2;
-                if(index == 16){
+            for(; value != 0; --value){
+                decompress_tile_buffer[index] = (value%2 == 0 ? byte1 : byte2);
+                if(++index == 16){
                     set_bkg_data(first_tile + position, 1, decompress_tile_buffer);
-                    ++position;
                     index = 0;
-                    if(position >= nb_tiles)
+                    if(++position >= nb_tiles)
                         return;
                 }
             }
