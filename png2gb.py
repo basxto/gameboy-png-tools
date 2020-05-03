@@ -240,9 +240,11 @@ def convert_image(width, height, filebase, pixel, d, m):
                         mapcounter += 1
                     
                     mapsize += 1
-    if args.compress_rle != "no":
+    if args.compress_rle != "no" or args.size != "no":
         print("Before compression: 0x{0:02X} bytes".format(datasize))
+    if args.compress_rle != "no":
         data = compress_rle(data)
+    if args.compress_rle != "no" or args.size != "no":
         print("After compression: 0x{0:02X} bytes".format(datasize))
     d.write(data)
     m.write(dmap)
@@ -286,6 +288,7 @@ def main():
     parser.add_argument("--palrom", "-p", default="", help="Address within the ROM, palette should be placed at")
     parser.add_argument("--limit", type=int, default=255, help="Maximum of tiles to put into data")
     parser.add_argument("--compress-rle", "-c", default="no", help="Additionally compress data with a simple RLE algorithm")
+    parser.add_argument("--size", "-s", default="no", help="Always print size for non compressed images")
     global args
 
     args = parser.parse_args()
