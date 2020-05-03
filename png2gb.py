@@ -31,23 +31,17 @@ def convert_tile(x, y, pixel):
 # when mask bit is 1, write the common double byte, if it is 0 read another doube byte
 # it should be possible to quickly skip through this encoding tile-wise
 
-# new idea:
+# current:
 # 2 bytes don’t have to be repeated more than 16 times (2 tiles)
 # one byte doesn’t have to run more than 32 times (2 tiles)
 # 00 0XXXXXXX - write through the next X bytes (127+1)
-# 80 100XXXXX - run next byte X times (31+2) - highest and lowest color only
+# 80 100XXXXX - run next byte X*2 times (31+2) - highest and lowest color only
 # A0 101XXXXX - run next byte X times alternating normal and inverted  (31+2) - middle colors only
 # C0 110HLXXX - High Low colored line X times (7+1)
 # E0 111XXXXX - run next 2 bytes X times alternating (30+2)
 # FF 11111111 - end of data
 
-# 1101 1111 represents 8 times 0xFF 0xFF, which are 16 bytes
-
-# current:
-# 0XXXXXXX - write through the next X bytes (127+1)
-# 100XXXXX - run next byte X times (63+2) - highest and lowest color only
-# 111XXXXX - run next 2 bytes X times alternating (63+2) - duplicate row
-# 11111111 - end of data
+# 1101 1111 represents 8 times 0xFF 0xFF, which are 16 bytes / one tile
 
 def compress_rle(data):
     global datasize
@@ -79,8 +73,8 @@ def compress_rle(data):
                 output += verbatim
                 datasize += 1+len(verbatim)
                 del verbatim[:]
-            # maximum counter reached
-            if counter == (0x1F + 3) or i == (len(data) - 1):
+            if i == (len(data) - 1):
+                # handle last iteration
                 append = False
                 if counter > (0x1F + 2):
                     # only put current byte into run if it's last run
@@ -93,7 +87,13 @@ def compress_rle(data):
                     datasize += 2
                 if append:
                     verbatim.append(data[i])
-                counter = 1
+            elif counter == (0x1F + 3):
+                # maximum counter reached
+                # switch to double mode
+                # double mode is 1 byte shorter
+                # if even amount of bytes is ahead
+                counter /= 2
+                mode = 1
         elif mode == 1 and (i+1) < len(data) and data[i-2] == data[i] and data[i-1] == data[i+1]:
             # run of alternating two bytes
             counter += 1

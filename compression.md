@@ -12,7 +12,7 @@ We won't need more than that, since we eliminate duplicate tiles. Even though 3 
 
 100, 101 and 111 don't need to run once, since 0 can handle that.
 
-Jumping to 111 when 100 hits it's limit might be useful, since this could save a byte on an even run. This could speed up decompression. This is not done currently.
+Jumps to 111 when 100 hits it's limit. This could save a byte on an even run.
 
 ```
 0XXX XXXX - write through the next X bytes (1-128)
