@@ -14,6 +14,11 @@ unsigned char decompress_tile_buffer[16];
 
 // this can't load into sprite VRAM < index 128
 unsigned char* set_bkg_data_rle(UINT8 first_tile, UINT8 nb_tiles, unsigned char *data, UINT8 skip_tiles) NONBANKED{
+    // max 0x0FF0
+    UINT16 skip_bytes = skip_tiles*16;
+    // data can be nb_tiles max [255] * (tile size [2*8] + verbatim [1])
+    // = 0x10EF
+    // verbatim can encode 8 full tiles, but we simplify
     UINT16 counter = 0;
     UINT8 index = 0;
     UINT8 position = 0;
@@ -21,38 +26,33 @@ unsigned char* set_bkg_data_rle(UINT8 first_tile, UINT8 nb_tiles, unsigned char 
     UINT8 value;
     UINT8 byte1;
     UINT8 byte2;
+    // code below depends on nb_tiles > 0
+    if(nb_tiles == 0)
+        return 0;
     while(1){
         cmd = data[counter++];
+        // we actually don't need this
         // end of compression
-        if(cmd == 0xFF){
+        /*if(cmd == 0xFF){
             return 0;
-        }else if((cmd & 0x80) == 0){
+        }else */
+        if((cmd & 0x80) == 0){
             //verbatim
             // cmd is amount; 0 is once
             ++cmd;
-            if(skip_tiles != 0){
-                // this variable just gets reused
-                byte1 = (cmd+index);
-                if(skip_tiles > byte1/16){
-                    counter += cmd;
-                    skip_tiles -= byte1/16;
-                    index = byte1%16;
-                    continue; // speed this up
-                }else{
-                    byte1 = skip_tiles*16 - index;
-                    cmd -= byte1;
-                    counter += byte1;
-                    index = 0;
-                    skip_tiles = 0;
-                }
+            if(skip_bytes != 0){
+                byte1 = (cmd > skip_bytes ? skip_bytes : cmd);
+                cmd -= byte1;
+                counter += byte1;
+                skip_bytes -= byte1;
             }
             for(; cmd != 0; --cmd){
-                decompress_tile_buffer[index] = data[counter++];
-                if(++index == 16){
-                    index = 0;
+                decompress_tile_buffer[index++] = data[counter++];
+                //if((index %= 16) == 0){
+                if((index &= 0xF) == 0){
                     if(first_tile != 0xFF)
-                        set_bkg_data(first_tile + position, 1, decompress_tile_buffer);
-                    if(++position >= nb_tiles)
+                        set_bkg_data(first_tile + (position++), 1, decompress_tile_buffer);
+                    if(--nb_tiles == 0)
                         return decompress_tile_buffer;
                 }
             }
@@ -90,26 +90,17 @@ unsigned char* set_bkg_data_rle(UINT8 first_tile, UINT8 nb_tiles, unsigned char 
                     value = (value + 2)*2;
                     break;
             }
-            if(skip_tiles != 0){
-                // this variable just gets reused
-                cmd = (value+index);
-                if(skip_tiles > cmd/16){
-                    skip_tiles -= cmd/16;
-                    index = cmd%16;
-                    continue; // speed this up
-                }else{
-                    value -= skip_tiles*16 - index;
-                    index = 0;
-                    skip_tiles = 0;
-                }
+            if(skip_bytes != 0){
+                cmd = (value > skip_bytes ? skip_bytes : value);
+                value -= cmd;
+                skip_bytes -= cmd;
             }
             for(; value != 0; --value){
-                decompress_tile_buffer[index] = (value%2 == 0 ? byte1 : byte2);
-                if(++index == 16){
-                    index = 0;
+                decompress_tile_buffer[index++] = (value%2 == 0 ? byte1 : byte2);
+                if((index &= 0xF) == 0){
                     if(first_tile != 0xFF)
-                        set_bkg_data(first_tile + position, 1, decompress_tile_buffer);
-                    if(++position >= nb_tiles)
+                        set_bkg_data(first_tile + (position++), 1, decompress_tile_buffer);
+                    if(--nb_tiles == 0)
                         return decompress_tile_buffer;
                 }
             }

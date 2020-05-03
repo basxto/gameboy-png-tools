@@ -360,10 +360,11 @@ def main():
         dataaccu += datasize
 
         convert_palette(original[3]['palette'], outbase, p)
-    if args.compress_rle != "no":
-        # end of compression
-        d.write("\t(0xFF),\n\t")
-        dataaccu+=1;
+    # we go by the length
+    #if args.compress_rle != "no":
+    #    # end of compression
+    #    d.write("\t(0xFF),\n\t")
+    #    dataaccu+=1;
     d.seek(d.tell() - 3, 0)
     d.write("\n};")
     d.write("\n// {0} tiles".format(mapcounter))
