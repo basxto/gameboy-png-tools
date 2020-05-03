@@ -8,5 +8,6 @@
 // returns pointer to the last decompressed tile, which will be overwritten on next call
 // returns 0 if it hits end of data
 // This is only useful for decompressing a single tile, you want to manipulate
-unsigned char* set_bkg_data_rle(UINT8 first_tile, UINT8 nb_tiles, unsigned char *data) NONBANKED;
+// other than set_bkg_data, this allows to skip tiles, since that can't be done without decompressing the data
+unsigned char* set_bkg_data_rle(UINT8 first_tile, UINT8 nb_tiles, unsigned char *data, UINT8 skip_tiles) NONBANKED;
 #endif

@@ -19,6 +19,8 @@ A tile limit for sprites can be defined, so you get warned when it would take up
 
 ROM addresses for data, mapping and palette can be defined if you don't want the compiler to handle that.
 
+The [decompressor](csrc/decompress.c) currently allocates **981 bytes**.
+
 You can see all accepted parameters with: (flag parameters need a `"yes"`)
 ```
 ./png2gb.py -h

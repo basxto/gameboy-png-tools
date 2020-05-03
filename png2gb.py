@@ -92,7 +92,7 @@ def compress_rle(data):
                 # switch to double mode
                 # double mode is 1 byte shorter
                 # if even amount of bytes is ahead
-                counter /= 2
+                counter = int(counter/2)
                 mode = 1
         elif mode == 1 and (i+1) < len(data) and data[i-2] == data[i] and data[i-1] == data[i+1]:
             # run of alternating two bytes

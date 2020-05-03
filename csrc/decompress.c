@@ -13,8 +13,7 @@ unsigned char decompress_tile_buffer[16];
 // FF 11111111 - end of data
 
 // this can't load into sprite VRAM < index 128
-// TODO: allow to skip bytes
-unsigned char* set_bkg_data_rle(UINT8 first_tile, UINT8 nb_tiles, unsigned char *data) NONBANKED{
+unsigned char* set_bkg_data_rle(UINT8 first_tile, UINT8 nb_tiles, unsigned char *data, UINT8 skip_tiles) NONBANKED{
     UINT16 counter = 0;
     UINT8 index = 0;
     UINT8 position = 0;
@@ -30,12 +29,29 @@ unsigned char* set_bkg_data_rle(UINT8 first_tile, UINT8 nb_tiles, unsigned char 
         }else if((cmd & 0x80) == 0){
             //verbatim
             // cmd is amount; 0 is once
-            for(++cmd; cmd != 0; --cmd){
+            ++cmd;
+            if(skip_tiles != 0){
+                // this variable just gets reused
+                byte1 = (cmd+index);
+                if(skip_tiles > byte1/16){
+                    counter += cmd;
+                    skip_tiles -= byte1/16;
+                    index = byte1%16;
+                    continue; // speed this up
+                }else{
+                    byte1 = skip_tiles*16 - index;
+                    cmd -= byte1;
+                    counter += byte1;
+                    index = 0;
+                    skip_tiles = 0;
+                }
+            }
+            for(; cmd != 0; --cmd){
                 decompress_tile_buffer[index] = data[counter++];
                 if(++index == 16){
+                    index = 0;
                     if(first_tile != 0xFF)
                         set_bkg_data(first_tile + position, 1, decompress_tile_buffer);
-                    index = 0;
                     if(++position >= nb_tiles)
                         return decompress_tile_buffer;
                 }
@@ -74,12 +90,25 @@ unsigned char* set_bkg_data_rle(UINT8 first_tile, UINT8 nb_tiles, unsigned char 
                     value = (value + 2)*2;
                     break;
             }
+            if(skip_tiles != 0){
+                // this variable just gets reused
+                cmd = (value+index);
+                if(skip_tiles > cmd/16){
+                    skip_tiles -= cmd/16;
+                    index = cmd%16;
+                    continue; // speed this up
+                }else{
+                    value -= skip_tiles*16 - index;
+                    index = 0;
+                    skip_tiles = 0;
+                }
+            }
             for(; value != 0; --value){
                 decompress_tile_buffer[index] = (value%2 == 0 ? byte1 : byte2);
                 if(++index == 16){
+                    index = 0;
                     if(first_tile != 0xFF)
                         set_bkg_data(first_tile + position, 1, decompress_tile_buffer);
-                    index = 0;
                     if(++position >= nb_tiles)
                         return decompress_tile_buffer;
                 }
