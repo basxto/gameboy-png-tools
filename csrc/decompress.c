@@ -99,7 +99,7 @@ unsigned char* set_bkg_data_rle(UINT8 first_tile, UINT8 nb_tiles, unsigned char 
             UINT8 tmp = (value > skip_bytes ? skip_bytes : value);
             value -= tmp;
             // only for value 1 and 0
-            if(cmd & 0x1 == cmd)
+            if((cmd & 0x1) == cmd)
                 data += tmp;
             skip_bytes -= tmp;
         }
