@@ -22,7 +22,7 @@ main_noc.ihx: main.rel
 	$(LK) -o $@ $^
 
 %.rel: %.c
-	$(CC) -o $@ $^
+	$(CC) $(CFLAGS) -o $@ $^
 
 gbdk-n:
 	$(MAKE) -C $(DEV)/gbdk-n
