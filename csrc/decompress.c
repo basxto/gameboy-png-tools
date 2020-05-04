@@ -3,6 +3,12 @@
 
 unsigned char decompress_tile_buffer[16];
 
+#ifndef NOMAPRLE
+// stuff needed for map decompression
+#include <string.h>
+unsigned char decompress_map_buffer[0xFF];
+#endif
+
 // 2 bytes don’t have to be repeated more than 16 times (2 tiles)
 // one byte doesn’t have to run more than 32 times (2 tiles)
 // 00 0XXXXXXX - write through the next X bytes (127+1)
@@ -25,8 +31,17 @@ unsigned char* set_bkg_data_rle(UINT8 first_tile, UINT8 nb_tiles, unsigned char 
         value = *(data++);
         // command part
         cmd = value & 0xE0;
-        
-        if((cmd & 0x80) == 0){
+        if(value == 0xFF){
+            // end of data, especially needed for non-image data
+#ifdef DEADMARKER
+            // generate a 0xDEAD marker
+            *(dectbuf++) = 0xDE;
+            if(dectbuf != decompress_tile_buffer)
+                *(dectbuf) = 0xAD;
+#endif
+            // this returns a partially filled tile
+            goto ret;
+        }else if((cmd & 0x80) == 0){
             //verbatim
             // value is amount; 0 is once
             ++value;
@@ -99,3 +114,24 @@ unsigned char* set_bkg_data_rle(UINT8 first_tile, UINT8 nb_tiles, unsigned char 
     }
     ret: return decompress_tile_buffer;
 }
+
+// this can be excluded if not needed, because it's quite huge
+#ifndef NOMAPRLE
+// 8 row and 2 bytes per row
+#define tile_size (8*2)
+// always returns a 256 byte big array
+// but only nb_bytes have meaningful content
+unsigned char* get_map_rle(UINT8 nb_bytes, unsigned char *data) NONBANKED{
+    unsigned char* pointer;
+    // won't be more than 16
+    UINT8 max = (nb_bytes/tile_size);
+    // ceil
+    if(nb_bytes%tile_size != 0)
+        ++max;
+    for(UINT8 i = 0; i <= max; ++i){
+        pointer = set_bkg_data_rle(0, 0, data, i);
+        memcpy(decompress_map_buffer+(tile_size*i), pointer, tile_size);
+    }
+    return decompress_map_buffer;
+}
+#endif
