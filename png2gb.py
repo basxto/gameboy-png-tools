@@ -23,8 +23,7 @@ def convert_tile(x, y, pixel):
     return tile
 
 # helper function for compress_rle
-def flush_verbatim(verbatim, output):
-    global datasize
+def flush_verbatim(verbatim, output, datasize):
     if(len(verbatim) == 2 and (verbatim[0] == '0xFF' or verbatim[0] == '0x00') and (verbatim[1] == '0xFF' or verbatim[1] == '0x00')):
         # 1 byte instead of 3
         h = 0x0
@@ -39,7 +38,7 @@ def flush_verbatim(verbatim, output):
         output.append("(0x{0:02X})".format(len(verbatim)-1))
         output += verbatim
         datasize += 1+len(verbatim)
-    return output
+    return datasize, output
 
 # idea:
 # this would reduce write through to 111
@@ -83,7 +82,7 @@ def compress_rle(data):
                 del verbatim[-1:]
             # flush verbatim buffer
             if len(verbatim) > 0:
-                output = flush_verbatim(verbatim, output)
+                datasize, output = flush_verbatim(verbatim, output, datasize)
                 del verbatim[:]
             if i == (len(data) - 1):
                 # handle last iteration
@@ -188,7 +187,7 @@ def compress_rle(data):
                 # only do this if it still fits
                 verbatim.append(data[i])
                 append = False
-            output = flush_verbatim(verbatim, output)
+            datasize, output = flush_verbatim(verbatim, output, datasize)
             del verbatim[:]
             if append:
                 verbatim.append(data[i])
@@ -196,7 +195,7 @@ def compress_rle(data):
         elif len(verbatim) >= 3 and mode == 0 and data[i-3] == data[i-1] and data[i-2] == data[i]:
             del verbatim[-3:]
             if len(verbatim) > 0:
-                output = flush_verbatim(verbatim, output)
+                datasize, output = flush_verbatim(verbatim, output, datasize)
                 del verbatim[:]
             counter = 2
             mode = 1
@@ -206,7 +205,7 @@ def compress_rle(data):
         i+=1
     # last byte
     if len(verbatim) > 0:
-        output = flush_verbatim(verbatim, output)
+        datasize, output = flush_verbatim(verbatim, output, datasize)
     # format output
     formatted_output = ""
     counter = 0
