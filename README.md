@@ -47,3 +47,12 @@ Compresses sequences, which increment with each further byte. This is especially
 png2gb: `--increment-compression=no`
 
 CFLAG: `-DNOINCREMENTER`
+
+----
+
+## RGBDS
+
+Image data and maps can be converted to RGBDS assembly with sdcc and gbdk-n:
+```
+../dev/gbdk-n/bin/gbdk-n-compile.sh -S --asm=rgbds overworld_a_gbc_data.c
+```
