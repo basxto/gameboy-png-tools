@@ -24,7 +24,7 @@ def convert_tile(x, y, pixel):
 
 # helper function for compress_rle
 def flush_verbatim(verbatim, output, datasize):
-    if(len(verbatim) == 2 and (verbatim[0] == '0xFF' or verbatim[0] == '0x00') and (verbatim[1] == '0xFF' or verbatim[1] == '0x00')):
+    if(args.color_line_compression == "yes" and len(verbatim) == 2 and (verbatim[0] == '0xFF' or verbatim[0] == '0x00') and (verbatim[1] == '0xFF' or verbatim[1] == '0x00')):
         # 1 byte instead of 3
         h = 0x0
         l = 0x0
@@ -40,15 +40,11 @@ def flush_verbatim(verbatim, output, datasize):
         datasize += 1+len(verbatim)
     return datasize, output
 
-# idea:
-# this would reduce write through to 111
-# maybe use X*2
-# 70 0111XXXX - run next byte X times incrementing it each time (15+2) - map compression
-
 # current:
 # 2 bytes don’t have to be repeated more than 16 times (2 tiles)
 # one byte doesn’t have to run more than 32 times (2 tiles)
-# 00 0XXXXXXX - write through the next X bytes (127+1)
+# 00 0XXXXXXX - write through the next X bytes (127+1-15)
+# 70 0111XXXX - run next byte X times incrementing it each time (15+2) - map compression
 # 80 100XXXXX - run next byte X times (31+2) - highest and lowest color only
 # A0 101XXXXX - run next byte X*2 times alternating normal and inverted  (31+2) - middle colors only
 # C0 110HLXXX - High Low colored line X times (7+1)
@@ -56,6 +52,8 @@ def flush_verbatim(verbatim, output, datasize):
 # FF 11111111 - end of data
 
 # 1101 1111 represents 8 times 0xFF 0xFF, which are 16 bytes / one tile
+
+# 70 and C0 can be unused, which shrinks down the decompressor
 
 def compress_rle(data):
     # we calculate new compressed datasize
@@ -66,7 +64,7 @@ def compress_rle(data):
     data = data.split(", ")
     output = []
     verbatim = [data[0]]
-    # 0 is one byte and 1 is 2 bytes
+    # 0 is one byte, 1 is 2 bytes and 2 is incremental
     mode = 0 
     # first character has run of 1
     counter = 1
@@ -117,7 +115,7 @@ def compress_rle(data):
                     counter -= 1
                     append = True
                 if(counter > 1):
-                    if counter <= 8 and (data[i-2] == '0xFF' or data[i-2] == '0x00') and (data[i-1] == '0xFF' or data[i-1] == '0x00'):
+                    if args.color_line_compression == "yes" and  counter <= 8 and (data[i-2] == '0xFF' or data[i-2] == '0x00') and (data[i-1] == '0xFF' or data[i-1] == '0x00'):
                         h = 0x0
                         l = 0x0
                         if data[i-2] == '0xFF':
@@ -144,10 +142,28 @@ def compress_rle(data):
                 mode = 0
             # since we handled two bytes
             i+=1
+        elif mode == 2 and (int(data[i-2], 16) + 1 == int(data[i-1], 16)) and (int(data[i-1], 16) + 1 == int(data[i], 16)):
+            counter += 1
+            if counter == (0xF + 3) or i == (len(data) - 1):
+                # maximum counter or end reached
+                append = False
+                # we have to calculate this once 0x01 would have 0x01 as data
+                inc = int(data[i], 16) - counter + 1
+                if counter > (0xF + 2):
+                    counter -= 1
+                    inc += 1
+                    append = True
+                output.append("(( 0x{0:02X}))".format(0x70 |  (counter-2)))
+                output.append("0x{0:02X}".format(inc))
+                datasize += 2
+                if append:
+                    verbatim.append(data[i])
+                counter = 1
+                mode = 0
         elif counter > 1:
             # run just ended
             if mode == 0:
-                if(counter <= 8*2 and counter%2 == 0 and (data[i-1] == '0xFF' or data[i-1] == '0x00')):
+                if args.color_line_compression == "yes" and (counter <= 8*2 and counter%2 == 0 and (data[i-1] == '0xFF' or data[i-1] == '0x00')):
                     hl = 0x0
                     if data[i-1] == '0xFF':
                         hl = 0x18
@@ -157,8 +173,8 @@ def compress_rle(data):
                     output.append("(0x{0:02X})".format(0x80 | (counter-2)))
                     output.append(data[i-1])
                     datasize += 2
-            else:
-                if counter <= 8 and (data[i-2] == '0xFF' or data[i-2] == '0x00') and (data[i-1] == '0xFF' or data[i-1] == '0x00'):
+            elif mode == 1:
+                if args.color_line_compression == "yes" and  counter <= 8 and (data[i-2] == '0xFF' or data[i-2] == '0x00') and (data[i-1] == '0xFF' or data[i-1] == '0x00'):
                     #print("We could optimize this")
                     h = 0x0
                     l = 0x0
@@ -177,10 +193,15 @@ def compress_rle(data):
                     output.append(data[i-2])
                     output.append(data[i-1])
                     datasize += 3
+            else: # mode 2
+                output.append("(0x{0:02X})".format(0x70 |  (counter-2)))
+                # we have to calculate this once 0x01 would have 0x01 as data
+                output.append("0x{0:02X}".format(int(data[i-1], 16) - counter + 1))
+                datasize += 2
             verbatim.append(data[i])
             counter = 1
             mode = 0
-        elif len(verbatim) == (0x7F + 1) or (len(verbatim) > 0 and i == (len(data) - 1)):
+        elif len(verbatim) == (0x7F + 1 - 0xF) or (len(verbatim) > 0 and i == (len(data) - 1)):
             # flush full verbatim buffer
             append = True
             if i == (len(data) - 1) and len(verbatim) < (0x7F + 1):
@@ -192,7 +213,16 @@ def compress_rle(data):
             if append:
                 verbatim.append(data[i])
             counter = 1
+        elif args.increment_compression == "yes" and len(verbatim) >= 2 and mode == 0 and (int(data[i-3], 16) + 1 == int(data[i-2], 16)) and (int(data[i-2], 16) + 1 == int(data[i-1], 16)) and (int(data[i-1], 16) + 1 == int(data[i], 16)):
+            # start incremental mode
+            del verbatim[-2:]
+            if len(verbatim) > 0:
+                datasize, output = flush_verbatim(verbatim, output, datasize)
+                del verbatim[:]
+            counter = 3
+            mode = 2
         elif len(verbatim) >= 3 and mode == 0 and data[i-3] == data[i-1] and data[i-2] == data[i]:
+            # start double byte mode
             del verbatim[-3:]
             if len(verbatim) > 0:
                 datasize, output = flush_verbatim(verbatim, output, datasize)
@@ -297,17 +327,19 @@ def main():
 
     parser = argparse.ArgumentParser()
     parser.add_argument('image', metavar='image.png', nargs='+',help='8bit PNG image')
-    parser.add_argument("--uncompressed", "-u", default="no", help="Allow duplicate tiles")
-    parser.add_argument("--width", type=int, default=1, help="Meta tile width")
-    parser.add_argument("--height", type=int, default=1, help="Meta tile height")
+    parser.add_argument("--uncompressed", "-u", default="no", help="Allow duplicate tiles (default: no)")
+    parser.add_argument("--width", type=int, default=1, help="Meta tile width (default: 1)")
+    parser.add_argument("--height", type=int, default=1, help="Meta tile height (default: 1)")
     parser.add_argument("--output", "-o", default="", help="Base name for output files (default: derived from image name)")
     parser.add_argument("--datarom", "-r", default="", help="Address within the ROM, data should be placed at")
     parser.add_argument("--maprom", "-m", default="", help="Address within the ROM, map should be placed at")
     parser.add_argument("--palrom", "-p", default="", help="Address within the ROM, palette should be placed at")
-    parser.add_argument("--limit", type=int, default=255, help="Maximum of tiles to put into data")
-    parser.add_argument("--compress-rle", "-c", default="no", help="Additionally compress data with an improved RLE algorithm")
-    parser.add_argument("--compress-map-rle", default="no", help="Additionally compress map with an improved RLE algorithm")
-    parser.add_argument("--size", "-s", default="no", help="Always print size for non compressed images")
+    parser.add_argument("--limit", type=int, default=255, help="Maximum of tiles to put into data (default: 255)")
+    parser.add_argument("--compress-rle", "-c", default="no", help="Additionally compress data with improved RLE algorithm (default: no)")
+    parser.add_argument("--compress-map-rle", default="no", help="Additionally compress map with improved RLE algorithm (default: no)")
+    parser.add_argument("--color-line-compression", default="yes", help="Encode rows with just one color in one byte (default: yes)")
+    parser.add_argument("--increment-compression", default="yes", help="Encode incrementing byte sequence (default: yes)")
+    parser.add_argument("--size", "-s", default="no", help="Always print size for non compressed images (default: no)")
     global args
 
     args = parser.parse_args()

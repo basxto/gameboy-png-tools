@@ -19,9 +19,31 @@ A tile limit for sprites can be defined, so you get warned when it would take up
 
 ROM addresses for data, mapping and palette can be defined if you don't want the compiler to handle that.
 
-The [decompressor](csrc/decompress.c) currently allocates **708 bytes**. [See the measure script](measure_size.sh).
+The [decompressor](csrc/decompress.c) currently allocates **708-1016 bytes**, depending on the used features. [See the measure script](measure_size.sh).
+
+Mappings can also be compressed with RLE. The decompressor for those can be disabled with `-DNOMAPRLE`.
 
 You can see all accepted parameters with: (flag parameters need a `"yes"`)
 ```
 ./png2gb.py -h
 ```
+
+----
+
+## Compression modes
+
+### No one colored lines compression
+
+This reduces a row to one byte, including command byte, and repeats it up to 8 times. Works only if the row has a constant color.
+
+png2gb: `--color-line-compression=no`
+
+CFLAG: `-DNOCOLORLINE`
+
+### No incremental sequence compression
+
+Compresses sequences, which increment with each further byte. This is especially handy for mappings.
+
+png2gb: `--increment-compression=no`
+
+CFLAG: `-DNOINCREMENTER`

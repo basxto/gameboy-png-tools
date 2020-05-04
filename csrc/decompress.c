@@ -12,6 +12,7 @@ unsigned char decompress_map_buffer[0xFF];
 // 2 bytes don’t have to be repeated more than 16 times (2 tiles)
 // one byte doesn’t have to run more than 32 times (2 tiles)
 // 00 0XXXXXXX - write through the next X bytes (127+1)
+// 70 0111XXXX - run next byte X times incrementing it each time (15+2) - map compression
 // 80 100XXXXX - run next byte X*2 times (31+2) - highest and lowest color only
 // A0 101XXXXX - run next byte X times alternating normal and inverted  (31+2) - middle colors only
 // C0 110HLXXX - High Low colored line X times (7+1)
@@ -31,28 +32,45 @@ unsigned char* set_bkg_data_rle(UINT8 first_tile, UINT8 nb_tiles, unsigned char 
         value = *(data++);
         // command part
         cmd = value & 0xE0;
+#ifndef NOMAPRLE
         if(value == 0xFF){
             // end of data, especially needed for non-image data
 #ifdef DEADMARKER
             // generate a 0xDEAD marker
             *(dectbuf++) = 0xDE;
-            if(dectbuf != decompress_tile_buffer)
-                *(dectbuf) = 0xAD;
+            while(dectbuf != decompress_tile_buffer)
+                *(dectbuf++) = 0xAD;
 #endif
             // this returns a partially filled tile
             goto ret;
-        }else if((cmd & 0x80) == 0){
+        }else
+#endif
+        if((cmd & 0x80) == 0){
             //verbatim
-            // value is amount; 0 is once
-            ++value;
+#ifndef NOINCREMENTER
+            cmd = 0;
+            if((value & 0xF0) == 0x70){
+                // incremental sequence
+                cmd = 0x70;
+                value = (value & 0xF) + 2;
+                byte1 = *(data++);
+            }else
+#endif
+                // value is amount; 0 is once
+                ++value;
+            
             if(skip_bytes != 0){
-                cmd = (value > skip_bytes ? skip_bytes : value);
-                value -= cmd;
-                data += cmd;
-                skip_bytes -= cmd;
+                byte2 = (value > skip_bytes ? skip_bytes : value);
+                value -= byte2;
+                data += byte2;
+                skip_bytes -= byte2;
             }
             for(; value != 0; --value){
+#ifndef NOINCREMENTER
+                *(dectbuf) = (cmd == 0 ? *(data++) : byte1++);
+#else
                 *(dectbuf) = *(data++);
+#endif
                 if (++dectbuf == decompress_tile_buffer+16) {
                     dectbuf = decompress_tile_buffer;
                     if(nb_tiles == 0)
@@ -65,6 +83,7 @@ unsigned char* set_bkg_data_rle(UINT8 first_tile, UINT8 nb_tiles, unsigned char 
         }else{
             // value part
             value &= 0x1F;
+#ifndef NOCOLORLINE
             if(cmd == 0xC0){
                 // one color line run
                 byte1 = (value & 0x10 ? 0xFF : 0x00);
@@ -74,6 +93,7 @@ unsigned char* set_bkg_data_rle(UINT8 first_tile, UINT8 nb_tiles, unsigned char 
                 // amount was for 2 bytes
                 value = ((value&0x7) + 1)*2;
             }else{
+#endif
                 byte1 = *(data++);
                 if(cmd == 0x80){
                     // run
@@ -93,7 +113,9 @@ unsigned char* set_bkg_data_rle(UINT8 first_tile, UINT8 nb_tiles, unsigned char 
                     // amount was for 2 bytes
                     value = (value+2)*2;
                 }
+#ifndef NOCOLORLINE
             }
+#endif
             if(skip_bytes != 0){
                 cmd = (value > skip_bytes ? skip_bytes : value);
                 value -= cmd;
@@ -128,6 +150,9 @@ unsigned char* get_map_rle(UINT8 nb_bytes, unsigned char *data) NONBANKED{
     // ceil
     if(nb_bytes%tile_size != 0)
         ++max;
+#ifdef DEADMARKER
+    memset(decompress_map_buffer, 0xAD, 0xFF);
+#endif
     for(UINT8 i = 0; i <= max; ++i){
         pointer = set_bkg_data_rle(0, 0, data, i);
         memcpy(decompress_map_buffer+(tile_size*i), pointer, tile_size);
