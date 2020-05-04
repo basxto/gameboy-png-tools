@@ -19,7 +19,7 @@ A tile limit for sprites can be defined, so you get warned when it would take up
 
 ROM addresses for data, mapping and palette can be defined if you don't want the compiler to handle that.
 
-The [decompressor](csrc/decompress.c) currently allocates **708-1016 bytes**, depending on the used features. [See the measure script](measure_size.sh).
+The [decompressor](csrc/decompress.c) currently allocates **547-924 bytes**, depending on the used features. [See the measure script](measure_size.sh).
 
 Mappings can also be compressed with RLE. The decompressor for those can be disabled with `-DNOMAPRLE`.
 

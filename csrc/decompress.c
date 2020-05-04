@@ -47,39 +47,17 @@ unsigned char* set_bkg_data_rle(UINT8 first_tile, UINT8 nb_tiles, unsigned char 
 #endif
         if((cmd & 0x80) == 0){
             //verbatim
-#ifndef NOINCREMENTER
             cmd = 0;
+#ifndef NOINCREMENTER
             if((value & 0xF0) == 0x70){
                 // incremental sequence
-                cmd = 0x70;
+                cmd = 1;
                 value = (value & 0xF) + 2;
                 byte1 = *(data++);
             }else
 #endif
                 // value is amount; 0 is once
                 ++value;
-            
-            if(skip_bytes != 0){
-                byte2 = (value > skip_bytes ? skip_bytes : value);
-                value -= byte2;
-                data += byte2;
-                skip_bytes -= byte2;
-            }
-            for(; value != 0; --value){
-#ifndef NOINCREMENTER
-                *(dectbuf) = (cmd == 0 ? *(data++) : byte1++);
-#else
-                *(dectbuf) = *(data++);
-#endif
-                if (++dectbuf == decompress_tile_buffer+16) {
-                    dectbuf = decompress_tile_buffer;
-                    if(nb_tiles == 0)
-                        goto ret;
-                    set_bkg_data(first_tile++, 1, decompress_tile_buffer);
-                    if(--nb_tiles == 0)
-                        goto ret;
-                }
-            }
         }else{
             // value part
             value &= 0x1F;
@@ -116,21 +94,33 @@ unsigned char* set_bkg_data_rle(UINT8 first_tile, UINT8 nb_tiles, unsigned char 
 #ifndef NOCOLORLINE
             }
 #endif
-            if(skip_bytes != 0){
-                cmd = (value > skip_bytes ? skip_bytes : value);
-                value -= cmd;
-                skip_bytes -= cmd;
-            }
-            for(; value != 0; --value){
-                *(dectbuf) = (value%2 == 0 ? byte1 : byte2);
-                if (++dectbuf == decompress_tile_buffer+16) {
-                    dectbuf = decompress_tile_buffer;
-                    if(nb_tiles == 0)
-                        goto ret;
-                    set_bkg_data(first_tile++, 1, decompress_tile_buffer);
-                    if(--nb_tiles == 0)
-                        goto ret;
-                }
+        }
+        if(skip_bytes != 0){
+            UINT8 tmp = (value > skip_bytes ? skip_bytes : value);
+            value -= tmp;
+            // only for value 1 and 0
+            if(cmd & 0x1 == cmd)
+                data += tmp;
+            skip_bytes -= tmp;
+        }
+        for(; value != 0; --value){
+            UINT8 tmp = byte2;
+            if(cmd == 0)
+                tmp = *(data++);
+#ifndef NOINCREMENTER
+            else if(cmd == 1)
+                tmp = byte1++;
+#endif
+            else if(value%2==0)
+                tmp = byte1;
+            *(dectbuf++) = tmp;
+            if (dectbuf == decompress_tile_buffer+16) {
+                dectbuf = decompress_tile_buffer;
+                if(nb_tiles == 0)
+                    goto ret;
+                set_bkg_data(first_tile++, 1, decompress_tile_buffer);
+                if(--nb_tiles == 0)
+                    goto ret;
             }
         }
     }
