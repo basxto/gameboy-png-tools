@@ -279,20 +279,7 @@ def convert_image(width, height, filebase, pixel, d, m):
                     
                     mapsize += 1
                     maprealsize += 1
-    if args.compress_rle != "no" or args.size != "no":
-        print("Before compression: 0x{0:02X} bytes".format(datasize))
-    if args.compress_rle != "no":
-        datasize, data = compress_rle(data)
-    if args.compress_rle != "no" or args.size != "no":
-        print("After compression: 0x{0:02X} bytes".format(datasize))
-    if args.compress_map_rle != "no" or args.size != "no":
-        print("Map before compression: 0x{0:02X} bytes".format(maprealsize))
-    if args.compress_map_rle != "no":
-        maprealsize, dmap = compress_rle(dmap)
-    if args.compress_map_rle != "no" or args.size != "no":
-        print("Map after compression: 0x{0:02X} bytes".format(maprealsize))
-    d.write(data)
-    m.write(dmap)
+    return data, dmap
 
 def convert_palette(palette, filebase, p):
     counter = 0
@@ -320,6 +307,8 @@ def main():
     global mapcounter
     mapcounter = 0
     global datasize
+    databuffer = ""
+    mapbuffer = ""
     datasize = 0
     dataaccu = 0
     mapaccu = 0
@@ -397,11 +386,27 @@ def main():
             print("Image width must be a multiple of {0}".format(8*args.width), file=sys.stderr)
             exit(2)
 
-        convert_image(original[0], original[1], outbase, list(original[2]), d, m)
+        data, dmap = convert_image(original[0], original[1], outbase, list(original[2]), d, m)
+        databuffer += data
+        mapbuffer += dmap
         dataaccu += datasize
         mapaccu += maprealsize
-
         convert_palette(original[3]['palette'], outbase, p)
+    # compress everything as a whole
+    if args.compress_rle != "no" or args.size != "no":
+        print("Before compression: 0x{0:02X} bytes".format(dataaccu))
+    if args.compress_rle != "no":
+        dataaccu, databuffer = compress_rle(databuffer)
+    if args.compress_rle != "no" or args.size != "no":
+        print("After compression: 0x{0:02X} bytes".format(dataaccu))
+    if args.compress_map_rle != "no" or args.size != "no":
+        print("Map before compression: 0x{0:02X} bytes".format(mapaccu))
+    if args.compress_map_rle != "no":
+        mapaccu, mapbuffer = compress_rle(mapbuffer)
+    if args.compress_map_rle != "no" or args.size != "no":
+        print("Map after compression: 0x{0:02X} bytes".format(mapaccu))
+    d.write(databuffer)
+    m.write(mapbuffer)
     # we go by the length
     #if args.compress_rle != "no":
     #    # end of compression
@@ -417,6 +422,7 @@ def main():
     if args.compress_map_rle != "no":
         #end of compression
         m.write("\n(0xFF)};")
+        mapaccu+=1
     else:
         m.write("\n};")
     m.write("\n// {0} tiles".format(mapsize))
