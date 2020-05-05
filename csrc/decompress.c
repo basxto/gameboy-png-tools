@@ -24,12 +24,11 @@ unsigned char* set_bkg_data_rle(UINT8 first_tile, UINT8 nb_tiles, unsigned char 
     // max 0x0FF0
     UINT16 skip_bytes = skip_tiles*16;
     unsigned char* dectbuf = decompress_tile_buffer;
-    UINT8 cmd;
-    UINT8 value;
-    UINT8 byte1;
-    UINT8 byte2;
+    UINT8 cmd, value, byte1, byte2;
+    // allows faster *(++data) in loop
+    --data;
     while(1){
-        value = *(data++);
+        value = *(++data);
         // command part
         cmd = value & 0xE0;
 #ifndef NOMAPRLE
@@ -38,7 +37,7 @@ unsigned char* set_bkg_data_rle(UINT8 first_tile, UINT8 nb_tiles, unsigned char 
 #ifdef DEADMARKER
             // generate a 0xDEAD marker
             *(dectbuf++) = 0xDE;
-            while(dectbuf != decompress_tile_buffer)
+            while(dectbuf != decompress_tile_buffer+16)
                 *(dectbuf++) = 0xAD;
 #endif
             // this returns a partially filled tile
@@ -49,11 +48,11 @@ unsigned char* set_bkg_data_rle(UINT8 first_tile, UINT8 nb_tiles, unsigned char 
             //verbatim
             cmd = 0;
 #ifndef NOINCREMENTER
-            if((value & 0xF0) == 0x70){
+            if((value & 0x70) == 0x70){
                 // incremental sequence
                 cmd = 1;
                 value = (value & 0xF) + 2;
-                byte1 = *(data++);
+                byte1 = *(++data);
             }else
 #endif
                 // value is amount; 0 is once
@@ -72,7 +71,7 @@ unsigned char* set_bkg_data_rle(UINT8 first_tile, UINT8 nb_tiles, unsigned char 
                 value = ((value&0x7) + 1)*2;
             }else{
 #endif
-                byte1 = *(data++);
+                byte1 = *(++data);
                 if(cmd == 0x80){
                     // run
                     byte2 = byte1;
@@ -85,7 +84,7 @@ unsigned char* set_bkg_data_rle(UINT8 first_tile, UINT8 nb_tiles, unsigned char 
                         byte2 = ~byte1;
                     }else{
                         // double byte run
-                        byte2 = *(data++);
+                        byte2 = *(++data);
                     }
                     // 0 counts as twice
                     // amount was for 2 bytes
@@ -98,15 +97,15 @@ unsigned char* set_bkg_data_rle(UINT8 first_tile, UINT8 nb_tiles, unsigned char 
         if(skip_bytes != 0){
             UINT8 tmp = (value > skip_bytes ? skip_bytes : value);
             value -= tmp;
-            // only for value 1 and 0
-            if((cmd & 0x1) == cmd)
+            // only verbatim needs this
+            if(cmd == 0)
                 data += tmp;
             skip_bytes -= tmp;
         }
         for(; value != 0; --value){
             UINT8 tmp = byte2;
             if(cmd == 0)
-                tmp = *(data++);
+                tmp = *(++data);
 #ifndef NOINCREMENTER
             else if(cmd == 1)
                 tmp = byte1++;
