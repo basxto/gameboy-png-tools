@@ -7,7 +7,12 @@ MKROM?=$(BIN)/gbdk-n-make-rom.sh
 
 ROM=png2gb
 
+.PHONY: build
 build: $(ROM).gb
+
+.PHONY: test
+test:
+	make -C ./test run
 
 $(ROM).gb: main.ihx
 	$(MKROM) $< $@
@@ -29,3 +34,4 @@ gbdk-n:
 
 clean:
 	find . -maxdepth 2 -type f -regex '.*.\(gb\|o\|map\|lst\|sym\|rel\|ihx\|lk\|noi\|asm\|adb\|cdb\|bi4\)' -delete
+	make -C ./test clean

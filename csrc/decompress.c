@@ -41,7 +41,7 @@ unsigned char decompress_map_buffer[0xFF];
 // FF 11111111 - end of data
 
 // this can't load into sprite VRAM < index 128
-unsigned char* set_bkg_data_rle(UINT8 first_tile, UINT8 nb_tiles, unsigned char *data, UINT8 skip_tiles) NONBANKED{
+unsigned char* set_bkg_data_rle(UINT8 first_tile, UINT8 nb_tiles, const unsigned char *data, UINT8 skip_tiles) NONBANKED{
     // max 0x0FF0
     UINT16 skip_bytes = skip_tiles*16;
     unsigned char* dectbuf = decompress_tile_buffer;
