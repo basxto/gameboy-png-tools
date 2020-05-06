@@ -9,6 +9,27 @@ unsigned char decompress_tile_buffer[16];
 unsigned char decompress_map_buffer[0xFF];
 #endif
 
+
+#define ENC_INC (0x70)
+#define ENC_INC_MIN (2)
+#define ENC_INC_MAX (ENC_INC_MIN+15)
+#define ENC_LIT (0x00)
+#define ENC_LIT_MIN (1)
+#define ENC_LIT_MAX (ENC_LIT_MIN+127-(ENC_INC_MAX-ENC_INC_MIN))
+#define ENC_RUN (0x80)
+#define ENC_RUN_MIN (2)
+#define ENC_RUN_MAX (ENC_RUN_MIN+31)
+#define ENC_INV (0xA0)
+#define ENC_INV_MIN (2)
+#define ENC_INV_MAX (ENC_INV_MIN+31)
+#define ENC_ROW (0xC0)
+#define ENC_ROW_MIN (1)
+#define ENC_ROW_MAX (ENC_ROW_MIN+7)
+#define ENC_ALT (0xE0)
+#define ENC_ALT_MIN (2)
+#define ENC_ALT_MAX (ENC_ALT_MIN+30)
+#define ENC_EOD (0xFF)
+
 // 2 bytes don’t have to be repeated more than 16 times (2 tiles)
 // one byte doesn’t have to run more than 32 times (2 tiles)
 // 00 0XXXXXXX - write through the next X bytes (127+1)
@@ -32,7 +53,7 @@ unsigned char* set_bkg_data_rle(UINT8 first_tile, UINT8 nb_tiles, unsigned char 
         // command part
         cmd = value & 0xE0;
 #ifndef NOMAPRLE
-        if(value == 0xFF){
+        if(value == ENC_EOD){
             // end of data, especially needed for non-image data
 #ifdef DEADMARKER
             // generate a 0xDEAD marker
@@ -48,10 +69,10 @@ unsigned char* set_bkg_data_rle(UINT8 first_tile, UINT8 nb_tiles, unsigned char 
             //verbatim
             cmd = 0;
 #ifndef NOINCREMENTER
-            if((value & 0x70) == 0x70){
+            if((value & ENC_INC) == ENC_INC){
                 // incremental sequence
                 cmd = 1;
-                value = (value & 0xF) + 2;
+                value = (value & 0xF) + ENC_INC_MIN;
                 byte1 = *(++data);
             }else
 #endif
@@ -61,22 +82,22 @@ unsigned char* set_bkg_data_rle(UINT8 first_tile, UINT8 nb_tiles, unsigned char 
             // value part
             value &= 0x1F;
 #ifndef NOCOLORLINE
-            if(cmd == 0xC0){
+            if(cmd == ENC_ROW){
                 // one color line run
                 byte1 = (value & 0x10 ? 0xFF : 0x00);
                 byte2 = (value & 0x8 ? 0xFF : 0x00);
                 // remove H and L bit
                 // 0 counts as once
                 // amount was for 2 bytes
-                value = ((value&0x7) + 1)*2;
+                value = ((value&0x7) + ENC_ROW_MIN)*2;
             }else{
 #endif
                 byte1 = *(++data);
-                if(cmd == 0x80){
+                if(cmd == ENC_RUN){
                     // run
                     byte2 = byte1;
                     // 0 counts as twice
-                    value += 2;
+                    value += ENC_RUN_MIN;
                 }else{
                     // matches 0x80 and 0xA0
                     if((cmd & 0x40) == 0){// 0xA0
@@ -88,7 +109,7 @@ unsigned char* set_bkg_data_rle(UINT8 first_tile, UINT8 nb_tiles, unsigned char 
                     }
                     // 0 counts as twice
                     // amount was for 2 bytes
-                    value = (value+2)*2;
+                    value = (value+ENC_INV_MIN)*2;
                 }
 #ifndef NOCOLORLINE
             }
