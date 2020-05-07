@@ -39,10 +39,69 @@ def array2data(arr):
         counter = (counter + 1) % 16
     return formatted_output[1:] + "\n"
 
+# print as hex
+def hx(num):
+    return "0x{0:02X}".format(num)
+
+# for commands bytes
+def hxc(num):
+    return "(0x{0:02X})".format(num)
+
+def enc_poppable(encoding_pair, amount=0):
+    cmd = int(encoding_pair[0].replace('(','').replace(')',''),16)
+    value = 0
+    if cmd == ENC_EOD:
+        sys.exit("{0}: error: 0xFF command in data stream".format(args.image[0]))
+    if (cmd & 0xF0) == ENC_INC:
+        value = cmd & 0xF
+        return value != 0
+    elif (cmd & 0x80) == 0:
+        return True
+    elif (cmd & 0xE0) == ENC_ROW:
+        value = cmd & 0x7
+    else:
+        value = cmd & 0x1F
+    return value-amount > 0
+
 # function for popping last character from encoding
 def enc_pop(encoding_pair):
-    element = 0
-    return element, encoding_pair
+    cmd = int(encoding_pair[0].replace('(','').replace(')',''),16)
+    if (cmd & 0xF0) == ENC_INC:
+        value = cmd & 0xF
+        if value == 0:
+            # had two elements, reduce to verbatim
+            return [hx(int(encoding_pair[1][0],16)+value+1)], [hxc(ENC_LIT), encoding_pair[1]]
+        else:
+            return [hx(int(encoding_pair[1][0],16)+value+1)], [hxc(cmd-1), encoding_pair[1]]
+    if (cmd & 0x80) == 0:#verbatim
+        if cmd == 0:
+            return [encoding_pair[1][0]], []
+        else:
+            return [encoding_pair[1][-1]], [hxc(cmd-1), encoding_pair[1][:-1]]
+    if (cmd & 0xE0) == ENC_ROW:
+        value = cmd & 0xE
+        byte1 = "0xFF"
+        byte2 = "0xFF"
+        if (cmd & 0x10) == 0:
+            byte1 = "0x00"
+        if (cmd & 0x8) == 0:
+            byte2 = "0x00"
+        if value == 0:
+            return [byte1, byte2], []
+        else:
+            return [byte1, byte2], [hx(cmd-1)]
+    value = cmd & 0x1F
+    if (cmd & 0xE0) == ENC_RUN or (cmd & 0xE0) == ENC_ALT:
+        if value == 0:
+            return encoding_pair[1], [hxc(ENC_LIT), encoding_pair[1]]
+        else:
+            return encoding_pair[1], [hxc(cmd-1), encoding_pair[1]]
+    if (cmd & 0xE0) == ENC_INV:
+        if value == 0:
+            return [encoding_pair[1][0], hx(int(encoding_pair[1][0],16)^0xFF)], [hxc(ENC_LIT), [encoding_pair[1][0], hx(int(encoding_pair[1][0],16)^0xFF)]]
+        else:
+            return [encoding_pair[1][0], hx(int(encoding_pair[1][0],16)^0xFF)], [hxc(cmd-1), encoding_pair[1]]
+    return [], encoding_pair
 
 # we don't have to look at the end of verbatim,
 # that's the only thing that got already done
@@ -54,6 +113,8 @@ def enc_pop(encoding_pair):
 # 10 could be followed by two increments of it, same goes for C0
 # -> saves nothing, slows down skipping
 # -> unless that’s all the verbatim contains = 1 byte saved
+# -> or we need at least 3 -> we'd already found that
+# X
 
 # 07 could be followed by repetitions of the last number
 # -> could become C0 or 80
@@ -74,6 +135,37 @@ def enc_pop(encoding_pair):
 # can this even save space?
 
 def improve_compression(output):
+    output = output.copy()
+    i = 1
+    while i < len(output):
+        cmd = int(output[i][0].replace('(','').replace(')',''),16)
+        lcmd = int(output[i-1][0].replace('(','').replace(')',''),16)
+        if (cmd & 0x80) == 0 and (cmd & ENC_INC) != ENC_INC:
+            value = cmd+ENC_LIT_MIN
+            # verbatim
+            if enc_poppable(output[i-1]) and value >= 2:
+                # they are all 1B
+                if (lcmd & 0xE) == ENC_RUN or (lcmd & 0xE) == ENC_INC or (lcmd & 0xE) == ENC_LIT:
+                    el, encoding_pair = enc_pop(output[i-1])
+                    el = int(el[0],16)
+                    byte1 = int(output[i][1][0],16)
+                    byte2 = int(output[i][1][1],16)
+                    if (lcmd & 0xE) == ENC_RUN and value == 2:
+                        if el + 1 == byte1 and byte1+1 == byte2:
+                            # ENC_INC
+                            print("- I found something improvable!")
+                    elif (lcmd & 0xE) == ENC_RUN and value == 3:
+                        byte3 = int(output[i][1][2],16)
+                        if el == byte2 and byte1 == byte3:
+                            # ENC_ALT || ENC_INV or even ENC_RUN || ENC_ROW
+                            print("- I found something improvable!!")
+            # those are usually not found because this length could interrupt LITs
+            # we lack knowledge during parsing
+            elif value == 2 and int(output[i][1][0],16)+1 == int(output[i][1][1],16):
+                # compress LIT to INC
+                output[i][0] = hxc(ENC_INC)
+                del output[i][1][1]
+        i += 1
     return output
 
 # helper function for compress_rle
@@ -86,19 +178,69 @@ def flush_verbatim(verbatim, output, datasize):
             h = 0x10
         if verbatim[1] == '0xFF':
             l = 0x08
-        output.append(["(0x{0:02X})".format(ENC_LIN | h | l | 0),[]])
+        output.append([hxc(ENC_ROW | h | l | 0),[]])
         datasize += 1
     else:
-        output.append(["(0x{0:02X})".format(ENC_LIT | len(verbatim)-1), verbatim.copy()])
+        output.append([hxc(ENC_LIT | len(verbatim)-1), verbatim.copy()])
         datasize += 1+len(verbatim)
     return datasize, output
 
-ENC_LIT = 0x00
-ENC_INC = 0x70
-ENC_RUN = 0x80
-ENC_INV = 0xA0
-ENC_LIN = 0xC0
-ENC_ALT = 0xE0
+ENC_INC = 0x70 # 2+
+ENC_INC_MIN = 2
+ENC_INC_MAX = ENC_INC_MIN+15
+ENC_LIT = 0x00 # 1+
+ENC_LIT_MIN = 1
+ENC_LIT_MAX = ENC_LIT_MIN+127-(ENC_INC_MAX-ENC_INC_MIN)
+ENC_RUN = 0x80 # 2+
+ENC_RUN_MIN = 2
+ENC_RUN_MAX = ENC_RUN_MIN+31
+ENC_INV = 0xA0 # 4+
+ENC_INV_MIN = 2
+ENC_INV_MAX = ENC_INV_MIN+31
+ENC_ROW = 0xC0 # 2+
+ENC_ROW_MIN = 1
+ENC_ROW_MAX = ENC_ROW_MIN+7
+ENC_ALT = 0xE0 # 4+
+ENC_ALT_MIN = 2
+ENC_ALT_MAX = ENC_ALT_MIN+30
+ENC_EOD = 0xFF # 0
+
+#newest idea:
+# command bytes with size, values
+# and outputed bytes per value
+#
+# 0x 0b       NAME SIZE  OUT VALUES
+####################################
+# 00 00000000 EOD [ 1B ] 0B  1
+# 00 0XXXXXXX LIT [1B+n] 1B  1-(127-15)
+# 70 0111XXXX INC [ 2B ] 1B  2-17
+# 80 100XXXXX RUN [ 2B ] 1B  2-33
+# A0 101HXXXL ROW [ 1B ] 2B  1-8
+# C0 11XXXXX0 INV [ 2B ] 2B  2-33
+# E0 11XXXXX1 ALT [ 3B ] 2B  2-33
+#
+# End Of Data marker
+# LITerally writes the following bytes through (worst case reduction)
+# INCrements the byte each iteration (mapping compression)
+# RUNs the byte X times (darkest and brightest color)
+# writes ROWs of constant color, High and Low are inverted (all four colors)
+# alternates between byte and it's INVersion (middle colors)
+# ALTernates between the two bytes (all four colors)
+#
+# == 0x0 is cheap
+# 0x1-1=0x0 and 0x0-1=0xFF
+# nibble swap is cheap
+# all who output 2B got their values shifted one to the left (*2)
+#
+# masks are 0x80 (lit) 0x70(inc) 0xE0 (run, row) 0xC1 (inv, alt)
+#
+# 70 and A0 could be disabled-> speeds up LIT and RUN
+# 00 00000000 EOD
+# 00 0XXXXXXX LIT
+# 80 10XXXXXX RUN
+# C0 11XXXXX0 INV
+# E0 11XXXXX1 ALT
+
 
 # current:
 # 2 bytes don’t have to be repeated more than 16 times (2 tiles)
@@ -178,7 +320,7 @@ def compress_rle(data):
                             h = 0x10
                         if data[i-1] == '0xFF':
                             l = 0x08
-                        output.append(["(0x{0:02X})".format(ENC_LIN | h | l | (int(counter)-1)),[]])
+                        output.append([hxc(ENC_ROW | h | l | (int(counter)-1)),[]])
                         datasize += 1
                     # only invert on a byte scale
                     elif int(data[i-2],16) == (int(data[i-1],16)^0xFF):
@@ -206,7 +348,7 @@ def compress_rle(data):
                     counter -= 1
                     inc += 1
                     append = True
-                output.append(["(( 0x{0:02X}))".format(0x70 |  (counter-2)), [inc]])
+                output.append(["(( 0x{0:02X}))".format(ENC_INC |  (counter-2)), [hx(inc)]])
                 datasize += 2
                 if append:
                     verbatim.append(data[i])
@@ -219,10 +361,10 @@ def compress_rle(data):
                     hl = 0x0
                     if data[i-1] == '0xFF':
                         hl = 0x18
-                    output.append(["(0x{0:02X})".format(ENC_LIN | hl | (int(counter/2)-1)), []])
+                    output.append([hxc(ENC_ROW | hl | (int(counter/2)-1)), []])
                     datasize += 1
                 else:
-                    output.append(["(0x{0:02X})".format(ENC_RUN | (counter-2)),[data[i-1]]])
+                    output.append([hxc(ENC_RUN | (counter-2)),[data[i-1]]])
                     datasize += 2
             elif mode == 1:
                 if args.color_line_compression == "yes" and  counter <= 8 and (data[i-2] == '0xFF' or data[i-2] == '0x00') and (data[i-1] == '0xFF' or data[i-1] == '0x00'):
@@ -232,17 +374,17 @@ def compress_rle(data):
                         h = 0x10
                     if data[i-1] == '0xFF':
                         l = 0x08
-                    output.append(["(0x{0:02X})".format(ENC_LIN | h | l | (int(counter)-1)),[]])
+                    output.append([hxc(ENC_ROW | h | l | (int(counter)-1)),[]])
                     datasize += 1
                 elif int(data[i-2],16) == (int(data[i-1],16)^0xFF):
-                    output.append(["(0x{0:02X})".format(ENC_INV | (counter-2)),[data[i-2]]])
+                    output.append([hxc(ENC_INV | (counter-2)),[data[i-2]]])
                     datasize += 2
                 else:
-                    output.append(["(0x{0:02X})".format(ENC_ALT | (counter-2)),[data[i-2], data[i-1]]])
+                    output.append([hxc(ENC_ALT | (counter-2)),[data[i-2], data[i-1]]])
                     datasize += 3
             else: # mode 2
                 # we have to calculate this once 0x01 would have 0x01 as data
-                output.append(["(0x{0:02X})".format(0x70 |  (counter-2)), ["0x{0:02X}".format(int(data[i-1], 16) - counter + 1)]])
+                output.append([hxc(ENC_INC |  (counter-2)), [hx(int(data[i-1], 16) - counter + 1)]])
                 datasize += 2
             verbatim.append(data[i])
             counter = 1
@@ -259,14 +401,16 @@ def compress_rle(data):
             if append:
                 verbatim.append(data[i])
             counter = 1
-        elif args.increment_compression == "yes" and len(verbatim) >= 2 and mode == 0 and (int(data[i-3], 16) + 1 == int(data[i-2], 16)) and (int(data[i-2], 16) + 1 == int(data[i-1], 16)) and (int(data[i-1], 16) + 1 == int(data[i], 16)):
-            # start incremental mode
-            del verbatim[-2:]
-            if len(verbatim) > 0:
-                datasize, output = flush_verbatim(verbatim, output, datasize)
-                del verbatim[:]
-            counter = 3
-            mode = 2
+        #TODO fix 'coz buggy
+        # the test fails
+        #elif args.increment_compression == "yes" and len(verbatim) >= 2 and mode == 0 and (int(data[i-3], 16) + 1 == int(data[i-2], 16)) and (int(data[i-2], 16) + 1 == int(data[i-1], 16)) and (int(data[i-1], 16) + 1 == int(data[i], 16)):
+        #    # start incremental mode
+        #    del verbatim[-2:]
+        #    if len(verbatim) > 0:
+        #        datasize, output = flush_verbatim(verbatim, output, datasize)
+        #        del verbatim[:]
+        #    counter = 3
+        #    mode = 2
         elif len(verbatim) >= 3 and mode == 0 and data[i-3] == data[i-1] and data[i-2] == data[i]:
             # start double byte mode
             del verbatim[-3:]
@@ -279,6 +423,11 @@ def compress_rle(data):
             verbatim.append(data[i])
             counter = 1
         i+=1
+    # last byte
+    if len(verbatim) > 0:
+        datasize, output = flush_verbatim(verbatim, output, datasize)
+
+    print("Unoptimized compression: 0x{0:02X} bytes".format(datasize))
     # save even more bytes
     # from decompnessor view it’s free
     output = improve_compression(output)
@@ -286,14 +435,14 @@ def compress_rle(data):
     #print(output)
     flatoutput = []
     for o in output:
-        flatoutput.append(o[0])
-        flatoutput+=o[1]
+        if len(o) > 0:
+            flatoutput.append(o[0])
+            flatoutput+=o[1]
+
+    datasize = len(flatoutput)
     #print(flatoutput)
-    if datasize != len(flatoutput):
-        print("Warning: counting is wrong {} vs {}".format(datasize, len(flatoutput)))
-    # last byte
-    if len(verbatim) > 0:
-        datasize, output = flush_verbatim(verbatim, output, datasize)
+    #if datasize != len(flatoutput):
+    #    print("Warning: counting is wrong {} vs {}".format(datasize, len(flatoutput)))
     return datasize, array2data(flatoutput)
 
 def convert_image(width, height, filebase, pixel, d, m):
@@ -331,7 +480,7 @@ def convert_image(width, height, filebase, pixel, d, m):
                     maprealsize += 1
     return data, dmap
 
-# We aim for ENC_LIN optimization foremost
+# We aim for ENC_ROW optimization foremost
 # 2 byte encoding after that
 def mapping_optimizer(data, dmap):
     sortedkeys = list({k: v for k, v in sorted(mapper.items(), key=lambda item: item[1][1], reverse=True)})

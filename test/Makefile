@@ -7,7 +7,10 @@ build: ./test
 run: ./test
 	./test
 
-test: test.c ../csrc/decompress.c ../csrc/decompress.h test1_data.c test1_uncompressed_data.c
+TESTS=test1 test2
+TESTDATA=$(foreach test, $(TESTS), $(test)_data.c $(test)_uncompressed_data.c)
+
+test: test.c ../csrc/decompress.c ../csrc/decompress.h  $(TESTDATA)
 	$(CC) $< -o $@
 
 %_uncompressed_data.c: %.png FORCE

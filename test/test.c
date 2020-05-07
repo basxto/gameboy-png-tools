@@ -46,6 +46,8 @@ int cmp_sprite_data(UINT8 first_tile, UINT8 nb_tiles, const unsigned char *data)
 #include "../csrc/decompress.c"
 #include "test1_data.c"
 #include "test1_uncompressed_data.c"
+#include "test2_data.c"
+#include "test2_uncompressed_data.c"
 
 int status = 0;
 
@@ -76,6 +78,17 @@ int main() {
     starttest(2);
     set_win_data_rle(first, nb, test1_data, 1);
     endtest(cmp_bkg_data(first, nb, test1_uncompressed_data+16));
+
+    nb = 0;
+    nb = test2_uncompressed_data_length;
+    starttest(3);
+    set_win_data_rle(first, nb, test2_data, 0);
+    endtest(cmp_bkg_data(first, nb, test2_uncompressed_data));
+
+    nb = 1;
+    starttest(4);
+    set_win_data_rle(first, nb, test2_data, 3);
+    endtest(cmp_bkg_data(first, nb, test2_uncompressed_data+(16*3)));
 
     return status;
 }
