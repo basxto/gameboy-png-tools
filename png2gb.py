@@ -150,7 +150,7 @@ def improve_compression(output):
                     el = int(el[0],16)
                     byte1 = int(output[i][1][0],16)
                     byte2 = int(output[i][1][1],16)
-                    if (lcmd & 0xE) == ENC_RUN and value == 2:
+                    if args.increment_compression == "yes" and  (lcmd & 0xE) == ENC_RUN and value == 2:
                         if el + 1 == byte1 and byte1+1 == byte2:
                             # ENC_INC
                             print("- I found something improvable!")
@@ -159,7 +159,7 @@ def improve_compression(output):
                         if el == byte2 and byte1 == byte3:
                             # ENC_ALT || ENC_INV or even ENC_RUN || ENC_ROW
                             print("- I found something improvable!!")
-            elif value == 1 and lcmd == ENC_ALT:# short for min amount ALT
+            elif args.increment_compression == "yes" and value == 1 and lcmd == ENC_ALT:# short for min amount ALT
                 # ALT A B LIT C -> INC A INC A
                 a = int(output[i-1][1][0],16)
                 b = int(output[i-1][1][1],16)
@@ -171,7 +171,7 @@ def improve_compression(output):
                     output[i][1][0] = output[i-1][1][0]
             # those are usually not found because this length could interrupt LITs
             # we lack knowledge during parsing
-            elif value == 2 and int(output[i][1][0],16)+1 == int(output[i][1][1],16):
+            elif args.increment_compression == "yes" and value == 2 and int(output[i][1][0],16)+1 == int(output[i][1][1],16):
                 # LIT A B -> INC A
                 output[i][0] = hxc(ENC_INC)
                 del output[i][1][1]
