@@ -12,7 +12,7 @@ build: $(ROM).gb
 
 .PHONY: test
 test:
-	make -C ./test run
+	./test/test_all.sh
 
 $(ROM).gb: main.ihx
 	$(MKROM) $< $@

@@ -145,7 +145,7 @@ def improve_compression(output):
             # verbatim
             if enc_poppable(output[i-1]) and value >= 2:
                 # they are all 1B
-                if (lcmd & 0xE) == ENC_RUN or (lcmd & 0xE) == ENC_INC or (lcmd & 0xE) == ENC_LIT:
+                if (lcmd & 0xE0) == ENC_RUN or (lcmd & 0xF0) == ENC_INC or (lcmd & 0x80) == ENC_LIT:
                     el, encoding_pair = enc_pop(output[i-1])
                     el = int(el[0],16)
                     byte1 = int(output[i][1][0],16)
@@ -159,10 +159,20 @@ def improve_compression(output):
                         if el == byte2 and byte1 == byte3:
                             # ENC_ALT || ENC_INV or even ENC_RUN || ENC_ROW
                             print("- I found something improvable!!")
+            elif value == 1 and lcmd == ENC_ALT:# short for min amount ALT
+                # ALT A B LIT C -> INC A INC A
+                a = int(output[i-1][1][0],16)
+                b = int(output[i-1][1][1],16)
+                c = int(output[i][1][0],16)
+                if a+1 == b and b+1 == c:
+                    output[i-1][0] = hxc(ENC_INC)
+                    del output[i-1][1][1]
+                    output[i][0] = hxc(ENC_INC + 1)
+                    output[i][1][0] = output[i-1][1][0]
             # those are usually not found because this length could interrupt LITs
             # we lack knowledge during parsing
             elif value == 2 and int(output[i][1][0],16)+1 == int(output[i][1][1],16):
-                # compress LIT to INC
+                # LIT A B -> INC A
                 output[i][0] = hxc(ENC_INC)
                 del output[i][1][1]
         i += 1

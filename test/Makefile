@@ -1,4 +1,4 @@
-pngconvert?=../png2gb.py
+pngconvert?=../png2gb.py $(PFLAGS)
 
 .PHONY: build
 build: ./test
@@ -7,17 +7,17 @@ build: ./test
 run: ./test
 	./test
 
-TESTS=test1 test2
+TESTS=test1 test2 test3
 TESTDATA=$(foreach test, $(TESTS), $(test)_data.c $(test)_uncompressed_data.c)
 
 test: test.c ../csrc/decompress.c ../csrc/decompress.h  $(TESTDATA)
-	$(CC) $< -o $@
+	$(CC) $(CFLAGS) $< -o $@
 
 %_uncompressed_data.c: %.png FORCE
-	$(pngconvert) $< -o $@
+	$(pngconvert) -u yes $< -o $@
 
 %_data.c: %.png FORCE
-	$(pngconvert) --compress-rle=1 $< -o $@
+	$(pngconvert) -u yes --compress-rle=1 $< -o $@
 
 clean:
 	rm -f ./test
