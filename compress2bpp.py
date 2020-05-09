@@ -479,6 +479,7 @@ def main():
     parser.add_argument("--output", "-o", default="", help="Base name for output files or - for stdout (default: derived from image name)")
     parser.add_argument("--color-line-compression", "-l", default="yes", help="Encode rows with just one color in one byte (default: yes)")
     parser.add_argument("--increment-compression", "-i", default="yes", help="Encode incrementing byte sequence (default: yes)")
+    parser.add_argument("--tile-length", "-t", default="no", help="Export tile length (default: no)")
     # this is mostly for debugging purpose,
     # since you can see what's data and command bytes this way
     parser.add_argument("--c-include", "-c", default="no", help="Output c source instead of binary file (default: no)")
@@ -510,6 +511,8 @@ def main():
         exit(1)
     if args.output != "-":
         print("Before compression: 0x{0:02X} bytes".format(len(data)))
+    # count amount of tiles which really end up in vram
+    mapcounter = int(len(data)/16)
     size, data = compress_rle(data)
     if args.output != "-":
         print("After compression: 0x{0:02X} bytes".format(size))
@@ -530,6 +533,8 @@ def main():
         d.write("const unsigned char {0}[] = ".format(os.path.basename('_'.join(args.output.split('.')[:-1])))+"{\n")
         d.write(data[:-3])
         d.write("\n};\n")
+        if args.tile_length:
+            d.write("\nconst unsigned char {0}_length = {1};\n".format(os.path.basename('_'.join(args.output.split('.')[:-1])), mapcounter))
     d.close()
     exit(0)
 
