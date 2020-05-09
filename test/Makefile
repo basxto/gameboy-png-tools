@@ -1,4 +1,5 @@
-pngconvert?=../png2gb.py $(PFLAGS)
+pngconvert?=../png2gb.py -ci
+compress?=../compress2bpp.py -ci $(PFLAGS)
 
 .PHONY: build
 build: ./test
@@ -17,7 +18,7 @@ test: test.c ../csrc/decompress.c ../csrc/decompress.h  $(TESTDATA)
 	$(pngconvert) -u yes $< -o $@
 
 %_data.c: %.png FORCE
-	$(pngconvert) -u yes --compress-rle=1 $< -o $@
+	$(pngconvert) -u yes $< -o $@ -bin | $(compress) - -o$@
 
 clean:
 	rm -f ./test
