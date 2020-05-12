@@ -191,6 +191,7 @@ ENC_ALT = 0xC1 # 4+
 ENC_ALT_MIN = 2
 ENC_ALT_MAX = ENC_ALT_MIN+30
 ENC_EOD = 0x00 # 0
+ENC_MON = 0x80 # 0
 
 #newest idea:
 # command bytes with size, values
@@ -252,6 +253,9 @@ def compress_rle(data):
     # we calculate new compressed datasize
     datasize = 0
     output = []
+    if args.monochrome != "no":
+        output.append([ENC_MON, []])
+        datasize += 1
     verbatim = [data[0]]
     # 0 is one byte, 1 is 2 bytes and 2 is incremental
     mode = 0
@@ -490,12 +494,17 @@ def main():
     # since you can see what's data and command bytes this way
     parser.add_argument("--c-include", "-c", default="no", help="Output c source instead of binary file (default: no)")
     # if length is not know by decompressor
+    parser.add_argument("--monochrome", "-m", default="no", help="Switch to image.1bpp mode (default: no)")
     parser.add_argument("--end-of-data", "-e", default="no", help="End with EOD (default: no)")
     global args
 
     args = parser.parse_args()
-    if args.image.split('.')[-1] != '2bpp' and args.image != "-":
-        print("Please give a .2bpp file", file=sys.stderr)
+    fileextension = args.image.split('.')[-1]
+    if ((args.monochrome == 'no' and fileextension != '2bpp') or (args.monochrome != 'no' and fileextension != '1bpp')) and args.image != "-":
+        if args.monochrome == 'no':
+            print("Please give a .2bpp file", file=sys.stderr)
+        else:
+            print("Please give a .1bpp file", file=sys.stderr)
         exit(1)
     if args.output == "":
         if args.image == "-":
@@ -539,6 +548,8 @@ def main():
         d.write("const unsigned char {0}[] = ".format(os.path.basename('_'.join(args.output.split('.')[:-1])))+"{\n")
         d.write(data[:-3])
         d.write("\n};\n")
+        if args.monochrome != "no":
+            mapcounter *= 2
         if args.tile_length:
             d.write("\nconst unsigned char {0}_length = {1};\n".format(os.path.basename('_'.join(args.output.split('.')[:-1])), mapcounter))
     d.close()
