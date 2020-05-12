@@ -9,26 +9,31 @@ unsigned char decompress_tile_buffer[16];
 unsigned char decompress_map_buffer[0xFF];
 #endif
 
+#ifndef __SDCC
+#define testprint(f_, ...) printf((f_), __VA_ARGS__)
+#else
+#define testprint(f_, ...)
+#endif
 
-#define ENC_INC (0x70)
+#define ENC_INC (0x00)
 #define ENC_INC_MIN (2)
 #define ENC_INC_MAX (ENC_INC_MIN+15)
 #define ENC_LIT (0x00)
-#define ENC_LIT_MIN (1)
+#define ENC_LIT_MIN (1-0x10)
 #define ENC_LIT_MAX (ENC_LIT_MIN+127-(ENC_INC_MAX-ENC_INC_MIN))
 #define ENC_RUN (0x80)
-#define ENC_RUN_MIN (2)
+#define ENC_RUN_MIN (1)
 #define ENC_RUN_MAX (ENC_RUN_MIN+31)
-#define ENC_INV (0xA0)
+#define ENC_INV (0xC0)
 #define ENC_INV_MIN (2)
 #define ENC_INV_MAX (ENC_INV_MIN+31)
-#define ENC_ROW (0xC0)
+#define ENC_ROW (0xA0)
 #define ENC_ROW_MIN (1)
 #define ENC_ROW_MAX (ENC_ROW_MIN+7)
 #define ENC_ALT (0xE0)
 #define ENC_ALT_MIN (2)
 #define ENC_ALT_MAX (ENC_ALT_MIN+30)
-#define ENC_EOD (0xFF)
+#define ENC_EOD (0x00)
 
 // 2 bytes don’t have to be repeated more than 16 times (2 tiles)
 // one byte doesn’t have to run more than 32 times (2 tiles)
@@ -46,6 +51,7 @@ unsigned char* set_bkg_data_rle(UINT8 first_tile, UINT8 nb_tiles, const unsigned
     UINT16 skip_bytes = skip_tiles*16;
     unsigned char* dectbuf = decompress_tile_buffer;
     UINT8 cmd, value, byte1, byte2;
+    UINT8 monochrome = 0;
     // allows faster *(++data) in loop
     --data;
     while(1){
@@ -69,7 +75,7 @@ unsigned char* set_bkg_data_rle(UINT8 first_tile, UINT8 nb_tiles, const unsigned
             //verbatim
             cmd = 0;
 #ifndef NOINCREMENTER
-            if((value & ENC_INC) == ENC_INC){
+            if((value & 0xF0) == ENC_INC){
                 // incremental sequence
                 cmd = 1;
                 value = (value & 0xF) + ENC_INC_MIN;
@@ -77,43 +83,38 @@ unsigned char* set_bkg_data_rle(UINT8 first_tile, UINT8 nb_tiles, const unsigned
             }else
 #endif
                 // value is amount; 0 is once
-                ++value;
+                value= (UINT8)(value + ENC_LIT_MIN);
         }else{
-            // value part
-            value &= 0x1F;
-#ifndef NOCOLORLINE
-            if(cmd == ENC_ROW){
-                // one color line run
-                byte1 = (value & 0x10 ? 0xFF : 0x00);
-                byte2 = (value & 0x8 ? 0xFF : 0x00);
-                // remove H and L bit
-                // 0 counts as once
-                // amount was for 2 bytes
-                value = ((value&0x7) + ENC_ROW_MIN)*2;
-            }else{
-#endif
-                byte1 = *(++data);
-                if(cmd == ENC_RUN){
-                    // run
-                    byte2 = byte1;
-                    // 0 counts as twice
-                    value += ENC_RUN_MIN;
-                }else{
-                    // matches 0x80 and 0xA0
-                    if((cmd & 0x40) == 0){// 0xA0
-                        // alternating inverted run
-                        byte2 = ~byte1;
-                    }else{
-                        // double byte run
-                        byte2 = *(++data);
+            value &= 0x7F;
+            if((cmd&0x40) == 0)
+                if((cmd&0x20)==0){//RUN
+                    if(value == 0){//moonchrome
+                        monochrome=1;
+                        continue;
                     }
-                    // 0 counts as twice
-                    // amount was for 2 bytes
-                    value = (value+ENC_INV_MIN)*2;
-                }
+                    byte2 = byte1 = *(++data);
+                    value += ENC_RUN_MIN;
 #ifndef NOCOLORLINE
-            }
+                }else{//ROW
+                    byte1 = (value & 0x10 ? 0xFF : 0x00);
+                    byte2 = (value & 0x1 ? 0xFF : 0x00);
+                    //value = ((value&0x7) + ENC_ROW_MIN)*2;
+                    value = (value&0xE) + (ENC_ROW_MIN*2);
 #endif
+                }
+            else{
+                byte1 = *(++data);
+                value &= 0xBF;
+                if((value&0x1)==0){//INV
+                    // no mask since it’s already 0
+                    byte2 = ~byte1;
+                    value += ENC_INV_MIN*2;
+                }else{//ALT
+                    // no mask since we can use that 1
+                    byte2 = *(++data);
+                    value += ENC_ALT_MIN*2 - 1;
+                }
+            }
         }
         if(skip_bytes != 0){
             UINT8 tmp = (value > skip_bytes ? skip_bytes : value);
@@ -134,6 +135,8 @@ unsigned char* set_bkg_data_rle(UINT8 first_tile, UINT8 nb_tiles, const unsigned
             else if(value%2==0)
                 tmp = byte1;
             *(dectbuf++) = tmp;
+            if((monochrome%2) == 1)// should be set from beginning of tile on
+                *(dectbuf++) = tmp;
             if (dectbuf == decompress_tile_buffer+16) {
                 dectbuf = decompress_tile_buffer;
                 if(nb_tiles == 0)

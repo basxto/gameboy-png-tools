@@ -164,33 +164,33 @@ def flush_verbatim(verbatim, output, datasize):
         if verbatim[0] == '0xFF':
             h = 0x10
         if verbatim[1] == '0xFF':
-            l = 0x08
+            l = 0x01
         output.append([ENC_ROW | h | l | 0,[]])
         datasize += 1
     else:
-        output.append([ENC_LIT | len(verbatim)-1, verbatim.copy()])
+        output.append([ENC_LIT | len(verbatim)-ENC_LIT_MIN, verbatim.copy()])
         datasize += 1+len(verbatim)
     return datasize, output
 
-ENC_INC = 0x70 # 2+
-ENC_INC_MIN = 2
+ENC_INC = 0x00 # 2+
+ENC_INC_MIN = 1
 ENC_INC_MAX = ENC_INC_MIN+15
 ENC_LIT = 0x00 # 1+
-ENC_LIT_MIN = 1
+ENC_LIT_MIN = (1-0x10)
 ENC_LIT_MAX = ENC_LIT_MIN+127-(ENC_INC_MAX-ENC_INC_MIN)
 ENC_RUN = 0x80 # 2+
-ENC_RUN_MIN = 2
-ENC_RUN_MAX = ENC_RUN_MIN+31
-ENC_INV = 0xA0 # 4+
+ENC_RUN_MIN = 1
+ENC_RUN_MAX = ENC_RUN_MIN+31-1
+ENC_INV = 0xC0 # 4+
 ENC_INV_MIN = 2
 ENC_INV_MAX = ENC_INV_MIN+31
-ENC_ROW = 0xC0 # 2+
+ENC_ROW = 0xA0 # 2+
 ENC_ROW_MIN = 1
 ENC_ROW_MAX = ENC_ROW_MIN+7
-ENC_ALT = 0xE0 # 4+
+ENC_ALT = 0xC1 # 4+
 ENC_ALT_MIN = 2
 ENC_ALT_MAX = ENC_ALT_MIN+30
-ENC_EOD = 0xFF # 0
+ENC_EOD = 0x00 # 0
 
 #newest idea:
 # command bytes with size, values
@@ -199,9 +199,10 @@ ENC_EOD = 0xFF # 0
 # 0x 0b       NAME SIZE  OUT VALUES
 ####################################
 # 00 00000000 EOD [ 1B ] 0B  1
-# 00 0XXXXXXX LIT [1B+n] 1B  1-(127-15)
-# 70 0111XXXX INC [ 2B ] 1B  2-17
-# 80 100XXXXX RUN [ 2B ] 1B  2-33
+# 00 0000XXXX INC [ 2B ] 1B  2-(17-1)       // don't forget in decompressor that this lost one
+# 00 0XXXXXXX LIT [1B+n] 1B  1-(128-15)
+# 80 10000000 MON [ 1B ] 0B  1
+# 80 100XXXXX RUN [ 2B ] 1B  2-(33-1)
 # A0 101HXXXL ROW [ 1B ] 2B  1-8
 # C0 11XXXXX0 INV [ 2B ] 2B  2-33
 # E0 11XXXXX1 ALT [ 3B ] 2B  2-33
@@ -209,10 +210,13 @@ ENC_EOD = 0xFF # 0
 # End Of Data marker
 # LITerally writes the following bytes through (worst case reduction)
 # INCrements the byte each iteration (mapping compression)
+# switch to MONochrome mode aka 1bpp
 # RUNs the byte X times (darkest and brightest color)
 # writes ROWs of constant color, High and Low are inverted (all four colors)
 # alternates between byte and it's INVersion (middle colors)
 # ALTernates between the two bytes (all four colors)
+#
+# Switching to 1bpp mode is only allowed at input byte position %2==0
 #
 # == 0x0 is cheap
 # 0x1-1=0x0 and 0x0-1=0xFF
@@ -276,7 +280,7 @@ def compress_rle(data):
                     counter -= 1
                     append = True
                 if(counter > 1):
-                    output.append([ENC_RUN | (counter-2),[data[i]]])
+                    output.append([ENC_RUN | (counter-ENC_RUN_MIN),[data[i]]])
                     datasize += 2
                 if append:
                     verbatim.append(data[i])
@@ -305,15 +309,15 @@ def compress_rle(data):
                         if data[i-2] == '0xFF':
                             h = 0x10
                         if data[i-1] == '0xFF':
-                            l = 0x08
-                        output.append([ENC_ROW | h | l | (int(counter)-1),[]])
+                            l = 0x01
+                        output.append([ENC_ROW | h | l | (int(counter)-1)<<1,[]])
                         datasize += 1
                     # only invert on a byte scale
                     elif data[i-2] == (data[i-1]^0xFF):
-                        output.append([ENC_INV | (counter-2),[data[i-2]]])
+                        output.append([ENC_INV | ((counter-ENC_INV_MIN)<<1),[data[i-2]]])
                         datasize += 2
                     else:
-                        output.append([ENC_ALT | (counter-2), [data[i-2], data[i-1]]])
+                        output.append([ENC_ALT | ((counter-ENC_ALT_MIN)<<1), [data[i-2], data[i-1]]])
                         datasize += 3
                 if append:
                     verbatim.append(data[i])
@@ -334,7 +338,7 @@ def compress_rle(data):
                     counter -= 1
                     inc += 1
                     append = True
-                output.append([ENC_INC |  (counter-2), [inc]])
+                output.append([ENC_INC |  (counter-ENC_INC_MIN), [inc]])
                 datasize += 2
                 if append:
                     verbatim.append(data[i])
@@ -346,11 +350,11 @@ def compress_rle(data):
                 if args.color_line_compression == "yes" and (counter <= 8*2 and counter%2 == 0 and (data[i-1] == '0xFF' or data[i-1] == '0x00')):
                     hl = 0x0
                     if data[i-1] == '0xFF':
-                        hl = 0x18
-                    output.append([ENC_ROW | hl | (int(counter/2)-1), []])
+                        hl = 0x11
+                    output.append([ENC_ROW | hl | (int(counter/2)-1)<<1, []])
                     datasize += 1
                 else:
-                    output.append([ENC_RUN | (counter-2),[data[i-1]]])
+                    output.append([ENC_RUN | (counter-ENC_RUN_MIN),[data[i-1]]])
                     datasize += 2
             elif mode == 1:
                 if args.color_line_compression == "yes" and  counter <= 8 and (data[i-2] == '0xFF' or data[i-2] == '0x00') and (data[i-1] == '0xFF' or data[i-1] == '0x00'):
@@ -359,18 +363,18 @@ def compress_rle(data):
                     if data[i-2] == '0xFF':
                         h = 0x10
                     if data[i-1] == '0xFF':
-                        l = 0x08
-                    output.append([ENC_ROW | h | l | (int(counter)-1),[]])
+                        l = 0x01
+                    output.append([ENC_ROW | h | l | (int(counter)-1)<<1,[]])
                     datasize += 1
                 elif data[i-2] == (data[i-1]^0xFF):
-                    output.append([ENC_INV | (counter-2),[data[i-2]]])
+                    output.append([ENC_INV | ((counter-ENC_INV_MIN)<<1),[data[i-2]]])
                     datasize += 2
                 else:
-                    output.append([ENC_ALT | (counter-2),[data[i-2], data[i-1]]])
+                    output.append([ENC_ALT | ((counter-ENC_ALT_MIN)<<1),[data[i-2], data[i-1]]])
                     datasize += 3
             else: # mode 2
                 # we have to calculate this once 0x01 would have 0x01 as data
-                output.append([ENC_INC |  (counter-2), [data[i-1] - counter + 1]])
+                output.append([ENC_INC |  (counter-ENC_INC_MIN), [data[i-1] - counter + 1]])
                 datasize += 2
             verbatim.append(data[i])
             counter = 1
@@ -416,7 +420,9 @@ def compress_rle(data):
         print("Unoptimized compression: 0x{0:02X} bytes".format(datasize))
     # save even more bytes
     # from decompnessor view it’s free
-    output = improve_compression(output)
+    # TODO: enable again
+    # TODO: make it undersstand new format
+    ##output = improve_compression(output)
     # flatten output
     #print(output)
 
