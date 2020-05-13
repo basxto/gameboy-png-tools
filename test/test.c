@@ -50,6 +50,8 @@ int cmp_sprite_data(UINT8 first_tile, UINT8 nb_tiles, const unsigned char *data)
 #include "test2_uncompressed_data.c"
 #include "test3_data.c"
 #include "test3_uncompressed_data.c"
+#include "test4_mon_data.c"
+#include "test4_mon_uncompressed_data.c"
 
 int status = 0;
 
@@ -72,36 +74,54 @@ int endtest(int result){
 int main() {
     UINT8 first = 0;
     UINT8 nb = test1_uncompressed_data_length;
+    // RLE
     starttest(1);
     set_win_data_rle(first, nb, test1_data, 0);
     endtest(cmp_bkg_data(first, nb, test1_uncompressed_data));
 
+    // skipping
     nb = 2;
     starttest(2);
     set_win_data_rle(first, nb, test1_data, 1);
     endtest(cmp_bkg_data(first, nb, test1_uncompressed_data+16));
 
+    // complex patterns
     nb = 0;
     nb = test2_uncompressed_data_length;
     starttest(3);
     set_win_data_rle(first, nb, test2_data, 0);
     endtest(cmp_bkg_data(first, nb, test2_uncompressed_data));
 
+    // skipping
     nb = 1;
     starttest(4);
     set_win_data_rle(first, nb, test2_data, 3);
     endtest(cmp_bkg_data(first, nb, test2_uncompressed_data+(16*3)));
 
+    // incremental pattern
     nb = 0;
     nb = test3_uncompressed_data_length;
     starttest(5);
     set_win_data_rle(first, nb, test3_data, 0);
     endtest(cmp_bkg_data(first, nb, test3_uncompressed_data));
 
+    // skipping
     nb = 1;
     starttest(6);
     set_win_data_rle(first, nb, test3_data, 1);
     endtest(cmp_bkg_data(first, nb, test3_uncompressed_data+16));
+
+    // 1bpp
+    nb = 27;
+    starttest(7);
+    set_win_data_rle(first, nb, test4_mon_data, 0);
+    endtest(cmp_bkg_data(first, nb, test4_mon_uncompressed_data));
+
+    // skipping in 1bpp
+    nb = 2;
+    starttest(8);
+    set_win_data_rle(first, nb, test4_mon_data, 10);
+    endtest(cmp_bkg_data(first, nb, test4_mon_uncompressed_data+(16*10)));
 
     return status;
 }
