@@ -88,6 +88,10 @@ unsigned char* set_bkg_data_rle(UINT8 first_tile, UINT8 nb_tiles, const unsigned
             value &= 0x7F;// remove leading 1
             if(value == 0){//switch monochrome mode
                 monochrome=!monochrome;
+                if(monochrome)
+                    skip_bytes /= 2;
+                else
+                    skip_bytes *= 2;
                 continue;
             }
             if((cmd&0x40) == 0){
@@ -124,7 +128,6 @@ unsigned char* set_bkg_data_rle(UINT8 first_tile, UINT8 nb_tiles, const unsigned
         }
         for(; value != 0; --value){
             UINT8 tmp = byte1;
-
             if(cmd == 0)
                 tmp = *(++data); // LIT
 #ifndef NOINCREMENTER
@@ -135,7 +138,7 @@ unsigned char* set_bkg_data_rle(UINT8 first_tile, UINT8 nb_tiles, const unsigned
                 tmp = byte2;
 
             *(dectbuf++) = tmp;
-            if(!monochrome)// should be set from beginning of tile on
+            if(monochrome)// should be set from beginning of tile on
                 *(dectbuf++) = tmp;
 
             if (dectbuf == decompress_tile_buffer+16) {

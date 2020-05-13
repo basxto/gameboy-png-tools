@@ -485,7 +485,7 @@ def main():
     # dimension of meta tiles
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('image', metavar='image.2bpp', help='2bit image or - for reading binary data from stdin')
+    parser.add_argument('image', metavar='image.2bpp', help='2bit or 1bit image or - for reading binary data from stdin')
     parser.add_argument("--output", "-o", default="", help="Base name for output files or - for stdout (default: derived from image name)")
     parser.add_argument("--color-line-compression", "-l", default="yes", help="Encode rows with just one color in one byte (default: yes)")
     parser.add_argument("--increment-compression", "-i", default="yes", help="Encode incrementing byte sequence (default: yes)")
@@ -494,13 +494,13 @@ def main():
     # since you can see what's data and command bytes this way
     parser.add_argument("--c-include", "-c", default="no", help="Output c source instead of binary file (default: no)")
     # if length is not know by decompressor
-    parser.add_argument("--monochrome", "-m", default="no", help="Switch to image.1bpp mode (default: no)")
+    parser.add_argument("--monochrome", "-m", default="no", help="Switch between 1bpp and 2bpp mode (default: no)")
     parser.add_argument("--end-of-data", "-e", default="no", help="End with EOD (default: no)")
     global args
 
     args = parser.parse_args()
     fileextension = args.image.split('.')[-1]
-    if ((args.monochrome == 'no' and fileextension != '2bpp') or (args.monochrome != 'no' and fileextension != '1bpp')) and args.image != "-":
+    if fileextension != '2bpp' and fileextension != '1bpp' and args.image != "-":
         if args.monochrome == 'no':
             print("Please give a .2bpp file", file=sys.stderr)
         else:
