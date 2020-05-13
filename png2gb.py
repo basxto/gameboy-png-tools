@@ -147,6 +147,14 @@ def main():
 
     if args.output != "" and args.output != "-":
         outbase = args.output
+        if args.output.split('.')[-1] == '1bpp':
+            outbase = args.output[:-5]
+        if args.output.split('.')[-1] == '2bpp':
+            outbase = args.output[:-5]
+        if args.output.split('.')[-1] == 'tilemap':
+            outbase = args.output[:-8]
+        if args.output.split('.')[-1] == 'pal':
+            outbase = args.output[:-4]
         if args.output.split('.')[-1] == 'png':
             outbase = args.output[:-4]
         if args.output.split('.')[-1] == 'c':
