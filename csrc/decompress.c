@@ -88,10 +88,7 @@ unsigned char* set_bkg_data_rle(UINT8 first_tile, UINT8 nb_tiles, const unsigned
             value &= 0x7F;// remove leading 1
             if(value == 0){//switch monochrome mode
                 monochrome=!monochrome;
-                if(monochrome)
-                    skip_bytes /= 2;
-                else
-                    skip_bytes *= 2;
+                skip_bytes = (monochrome? skip_bytes>>1 : skip_bytes<<1);
                 continue;
             }
             if((cmd&0x40) == 0){

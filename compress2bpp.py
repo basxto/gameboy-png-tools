@@ -174,7 +174,7 @@ def flush_verbatim(verbatim, output, datasize):
 
 ENC_INC = 0x00 # 2+
 ENC_INC_MIN = 1
-ENC_INC_MAX = ENC_INC_MIN+15
+ENC_INC_MAX = ENC_INC_MIN+15-1 #exclude MON
 ENC_LIT = 0x00 # 1+
 ENC_LIT_MIN = (1-0x10)
 ENC_LIT_MAX = ENC_LIT_MIN+127-(ENC_INC_MAX-ENC_INC_MIN)
@@ -333,14 +333,13 @@ def compress_rle(data):
             i+=1
         elif mode == 2 and (data[i-2] + 1 == data[i-1]) and (data[i-1] + 1 == data[i]):
             counter += 1
-            if counter == (0xF + 3) or i == (len(data) - 1):
+            if counter == (ENC_INC_MAX+1) or i == (len(data) - 1):
                 # maximum counter or end reached
                 append = False
                 # we have to calculate this once 0x01 would have 0x01 as data
                 inc = data[i] - counter + 1
-                if counter > (0xF + 2):
+                if counter > (ENC_INC_MAX):
                     counter -= 1
-                    inc += 1
                     append = True
                 output.append([ENC_INC |  (counter-ENC_INC_MIN), [inc]])
                 datasize += 2
@@ -395,16 +394,14 @@ def compress_rle(data):
             if append:
                 verbatim.append(data[i])
             counter = 1
-        #TODO fix 'coz buggy
-        # the test fails
-        #elif args.increment_compression == "yes" and len(verbatim) >= 2 and mode == 0 and (data[i-3] + 1 == data[i-2]) and (data[i-2] + 1 == data[i-1]) and (data[i-1] + 1 == data[i]):
-        #    # start incremental mode
-        #    del verbatim[-2:]
-        #    if len(verbatim) > 0:
-        #        datasize, output = flush_verbatim(verbatim, output, datasize)
-        #        del verbatim[:]
-        #    counter = 3
-        #    mode = 2
+        elif args.increment_compression == "yes" and len(verbatim) >= 2 and mode == 0 and (data[i-3] + 1 == data[i-2]) and (data[i-2] + 1 == data[i-1]) and (data[i-1] + 1 == data[i]):
+            # start incremental mode
+            del verbatim[-2:]
+            if len(verbatim) > 0:
+                datasize, output = flush_verbatim(verbatim, output, datasize)
+                del verbatim[:]
+            counter = 3
+            mode = 2
         elif len(verbatim) >= 3 and mode == 0 and data[i-3] == data[i-1] and data[i-2] == data[i]:
             # start double byte mode
             del verbatim[-3:]
