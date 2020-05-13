@@ -53,7 +53,7 @@ unsigned char* set_bkg_data_rle(UINT8 first_tile, UINT8 nb_tiles, const unsigned
     UINT16 skip_bytes = skip_tiles*16;
     unsigned char* dectbuf = decompress_tile_buffer;
     UINT8 cmd, value, byte1, byte2;
-    UINT8 nomonochrome = 1;
+    _Bool monochrome = 0;
     // allows faster *(++data) in loop
     --data;
     while(1){
@@ -86,8 +86,8 @@ unsigned char* set_bkg_data_rle(UINT8 first_tile, UINT8 nb_tiles, const unsigned
                 value= (UINT8)(value-1 + ENC_LIT_MIN);
         }else{
             value &= 0x7F;// remove leading 1
-            if(value == 0){//nomonochrome mode
-                nomonochrome=0;
+            if(value == 0){//switch monochrome mode
+                monochrome=!monochrome;
                 continue;
             }
             if((cmd&0x40) == 0){
@@ -135,7 +135,7 @@ unsigned char* set_bkg_data_rle(UINT8 first_tile, UINT8 nb_tiles, const unsigned
                 tmp = byte2;
 
             *(dectbuf++) = tmp;
-            if((nomonochrome%2) == 0)// should be set from beginning of tile on
+            if(!monochrome)// should be set from beginning of tile on
                 *(dectbuf++) = tmp;
 
             if (dectbuf == decompress_tile_buffer+16) {
