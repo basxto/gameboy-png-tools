@@ -1,5 +1,6 @@
 // complementary decompressor for png2gb.py
 #include "decompress.h"
+#include "utils.h"
 
 unsigned char decompress_tile_buffer[16];
 
@@ -15,27 +16,25 @@ unsigned char decompress_map_buffer[0xFF];
 #define testprint(f_, ...)
 #endif
 
-#define MIN(X, Y) (((X) < (Y)) ? (X) : (Y))
-
-#define ENC_INC (0x00)
-#define ENC_INC_MIN (1)
-#define ENC_INC_MAX (ENC_INC_MIN+15)
-#define ENC_LIT (0x00)
+#define ENC_INC $(0x00)
+#define ENC_INC_MIN $(1)
+#define ENC_INC_MAX $(ENC_INC_MIN+15)
+#define ENC_LIT $(0x00)
 #define ENC_LIT_MIN (1-0x10)
-#define ENC_LIT_MAX (ENC_LIT_MIN+127-(ENC_INC_MAX-ENC_INC_MIN))
-#define ENC_RUN (0x80)
-#define ENC_RUN_MIN (1)
-#define ENC_RUN_MAX (ENC_RUN_MIN+31)
-#define ENC_INV (0xC0)
-#define ENC_INV_MIN (2)
-#define ENC_INV_MAX (ENC_INV_MIN+31)
-#define ENC_ROW (0xA0)
-#define ENC_ROW_MIN (1)
-#define ENC_ROW_MAX (ENC_ROW_MIN+7)
-#define ENC_ALT (0xE0)
-#define ENC_ALT_MIN (2)
-#define ENC_ALT_MAX (ENC_ALT_MIN+30)
-#define ENC_EOD (0x00)
+#define ENC_LIT_MAX $(ENC_LIT_MIN+127-(ENC_INC_MAX-ENC_INC_MIN))
+#define ENC_RUN $(0x80)
+#define ENC_RUN_MIN $(1)
+#define ENC_RUN_MAX $(ENC_RUN_MIN+31)
+#define ENC_INV $(0xC0)
+#define ENC_INV_MIN $(2)
+#define ENC_INV_MAX $(ENC_INV_MIN+31)
+#define ENC_ROW $(0xA0)
+#define ENC_ROW_MIN $(1)
+#define ENC_ROW_MAX $(ENC_ROW_MIN+7)
+#define ENC_ALT $(0xE0)
+#define ENC_ALT_MIN $(2)
+#define ENC_ALT_MAX $(ENC_ALT_MIN+30)
+#define ENC_EOD $(0x00)
 
 // 2 bytes don’t have to be repeated more than 16 times (2 tiles)
 // one byte doesn’t have to run more than 32 times (2 tiles)
@@ -50,7 +49,7 @@ unsigned char decompress_map_buffer[0xFF];
 // this can't load into sprite VRAM < index 128
 unsigned char* set_bkg_data_rle(UINT8 first_tile, UINT8 nb_tiles, const unsigned char *data, UINT8 skip_tiles) NONBANKED{
     // max 0x0FF0
-    UINT16 skip_bytes = skip_tiles*16;
+    UINT16 skip_bytes = skip_tiles*$(16);
     unsigned char* dectbuf = decompress_tile_buffer;
     UINT8 cmd, value, byte1, byte2;
     _Bool monochrome = 0;
@@ -72,18 +71,18 @@ unsigned char* set_bkg_data_rle(UINT8 first_tile, UINT8 nb_tiles, const unsigned
         }
 #endif
         cmd = value;
-        if((cmd & 0x80) == 0){
+        if((cmd & $(0x80)) == 0){
             cmd = 0;
             ++value;
 #ifndef NOINCREMENTER
-            if((value & 0xF0) == ENC_INC){
+            if((value & $(0xF0)) == ENC_INC){
                 // incremental sequence
                 ++cmd;
                 byte1 = *(++data);
             }else
 #endif
                 //verbatim
-                value= (UINT8)(value-1 + ENC_LIT_MIN);
+                value= $(value-1 + ENC_LIT_MIN);
         }else{
             value &= 0x7F;// remove leading 1
             if(value == 0){//switch monochrome mode
@@ -93,29 +92,30 @@ unsigned char* set_bkg_data_rle(UINT8 first_tile, UINT8 nb_tiles, const unsigned
             }
             if((cmd&0x40) == 0){
                 ++value;
-                if((cmd&0x20)==0){//RUN
+                if((cmd&$(0x20))==0){//RUN
                     byte1 = *(++data);
                     byte2 = byte1;
 #ifndef NOCOLORLINE
                 }else{//ROW
-                    UINT8 tmp0 = 0x00;
-                    UINT8 tmpF = 0xFF;
-                    byte1 = (value & 0x10 ? tmpF : tmp0);
-                    byte2 = (value & 0x1 ? tmpF : tmp0);
-                    value = (value&0xE) + (ENC_ROW_MIN*2) - 1;
+                    UINT8 tmp0 = $(0x00);
+                    UINT8 tmpF = $(0xFF);
+                    byte1 = (value & $(0x10) ? tmpF : tmp0);
+                    byte2 = (value & $(0x01) ? tmpF : tmp0);
+                    value = (value&$(0xE)) + (ENC_ROW_MIN*$(2)) - $(1);
 #endif
                 }
             }else{
-                value = (value&0xBE)+4;
+                value = (value&$(0xBE))+$(4);
                 byte1 = *(++data);
                 byte2 = ~byte1;//INV
-                if((cmd&0x1)!=0){//ALT
+                if((cmd&$(0x1))!=0){//ALT
                     byte2 = *(++data);
                 }
             }
             cmd = 4;
         }
         if(skip_bytes != 0){
+            // if skip_bytes is smaller than value, it fits into a UINT8
             UINT8 tmp = MIN(value, skip_bytes);
             // only verbatim needs this
             if(cmd == 0)
@@ -143,7 +143,7 @@ unsigned char* set_bkg_data_rle(UINT8 first_tile, UINT8 nb_tiles, const unsigned
                 if(nb_tiles == 0)
                     goto ret;
                 set_bkg_data(first_tile++, 1, decompress_tile_buffer);
-                if(--nb_tiles == 0)
+                if($(--nb_tiles) == 0)
                     goto ret;
             }
         }
