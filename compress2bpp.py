@@ -26,7 +26,7 @@ def enc_poppable(encoding_pair, amount=0):
     cmd = encoding_pair[0]
     value = 0
     if cmd == ENC_EOD:
-        sys.exit("{0}: error: 0xFF command in data stream".format(args.image[0]))
+        sys.exit("{0}: error: 0x00 command in data stream".format(args.image[0]))
     if cmd == ENC_MON:
         # just skip / we can't handle that yet
         return False
@@ -37,9 +37,9 @@ def enc_poppable(encoding_pair, amount=0):
         else: # LIT
             return True
     elif (cmd & 0xE0) == ENC_ROW:
-        value = cmd & 0xE
+        value = (cmd & 0xE) >> 1
     elif (cmd&0xC0) == 0xC0:#those two use a different format
-        value = cmd & 0x3E
+        value = (cmd & 0x3E) >> 1
     else:
         value = cmd & 0x1F
     return value-amount > 0
@@ -60,7 +60,7 @@ def enc_pop(encoding_pair):
         else:
             return [encoding_pair[1][-1]], [cmd-1, encoding_pair[1][:-1]]
     if (cmd & 0xE0) == ENC_ROW:
-        value = cmd & 0xE
+        value = (cmd & 0xE) >> 1
         byte1 = "0xFF"
         byte2 = "0xFF"
         if (cmd & 0x10) == 0: #TODO: invert format at some point
