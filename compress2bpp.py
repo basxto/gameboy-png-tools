@@ -27,13 +27,19 @@ def enc_poppable(encoding_pair, amount=0):
     value = 0
     if cmd == ENC_EOD:
         sys.exit("{0}: error: 0xFF command in data stream".format(args.image[0]))
-    if (cmd & 0xF0) == ENC_INC:
-        value = cmd & 0xF
-        return value != 0
-    elif (cmd & 0x80) == 0:
-        return True
+    if cmd == ENC_MON:
+        # just skip / we can't handle that yet
+        return False
+    if (cmd & 0x80) == 0:
+        if (cmd & 0x30) == 0: # INC
+            value = cmd #& 0xF
+            return value != 0
+        else: # LIT
+            return True
     elif (cmd & 0xE0) == ENC_ROW:
-        value = cmd & 0x7
+        value = cmd & 0xE
+    elif (cmd&0xC0) == 0xC0:#those two use a different format
+        value = cmd & 0x3E
     else:
         value = cmd & 0x1F
     return value-amount > 0
@@ -42,10 +48,10 @@ def enc_poppable(encoding_pair, amount=0):
 def enc_pop(encoding_pair):
     cmd = encoding_pair[0]
     if (cmd & 0xF0) == ENC_INC:
-        value = cmd & 0xF
+        value = (cmd & 0xF) - 1 #-EOD
         if value == 0:
             # had two elements, reduce to verbatim
-            return [encoding_pair[1][0]+value+1], [ENC_LIT, encoding_pair[1]]
+            return [encoding_pair[1][0]+value+1], [ENC_LIT - 1 + ENC_LIT_MIN, encoding_pair[1]]
         else:
             return [encoding_pair[1][0]+value+1], [cmd-1, encoding_pair[1]]
     if (cmd & 0x80) == 0:#verbatim
@@ -57,25 +63,33 @@ def enc_pop(encoding_pair):
         value = cmd & 0xE
         byte1 = "0xFF"
         byte2 = "0xFF"
-        if (cmd & 0x10) == 0:
+        if (cmd & 0x10) == 0: #TODO: invert format at some point
             byte1 = "0x00"
-        if (cmd & 0x8) == 0:
+        if (cmd & 0x1) == 0:
             byte2 = "0x00"
         if value == 0:
             return [byte1, byte2], []
         else:
-            return [byte1, byte2], [cmd-1]
+            return [byte1, byte2], [cmd-(1<<1)]
     value = cmd & 0x1F
-    if (cmd & 0xE0) == ENC_RUN or (cmd & 0xE0) == ENC_ALT:
+    if (cmd&0xC0) == 0xC0:#those two use a different format
+        value = cmd & 0x3E
+    if (cmd & 0xE0) == ENC_RUN:
+        value -= 1 # - MON
+    if (cmd & 0xE0) == ENC_RUN or (cmd & 0xC1) == ENC_ALT:
+        # encoding_pair[1] can be one or two values
         if value == 0:
-            return encoding_pair[1], [ENC_LIT, encoding_pair[1]]
+            return encoding_pair[1], [ENC_LIT - 1 + ENC_LIT_MIN, encoding_pair[1]]
         else:
-            return encoding_pair[1], [cmd-1, encoding_pair[1]]
-    if (cmd & 0xE0) == ENC_INV:
+            if (cmd & 0xC1) == ENC_ALT:
+                return encoding_pair[1], [cmd-(1<<1), encoding_pair[1]]
+            else:
+                return encoding_pair[1], [cmd-1, encoding_pair[1]]
+    if (cmd & 0xC1) == ENC_INV:
         if value == 0:
-            return [encoding_pair[1][0], encoding_pair[1][0]^0xFF], [ENC_LIT, [encoding_pair[1][0], encoding_pair[1][0]^0xFF]]
+            return [encoding_pair[1][0], encoding_pair[1][0]^0xFF], [ENC_LIT - 1 + ENC_LIT_MIN, [encoding_pair[1][0], encoding_pair[1][0]^0xFF]]
         else:
-            return [encoding_pair[1][0], encoding_pair[1][0]^0xFF], [cmd-1, encoding_pair[1]]
+            return [encoding_pair[1][0], encoding_pair[1][0]^0xFF], [cmd-(1<<1), encoding_pair[1]]
     return [], encoding_pair
 
 # we don't have to look at the end of verbatim,
@@ -115,7 +129,7 @@ def improve_compression(output):
     while i < len(output):
         cmd = output[i][0]
         lcmd = output[i-1][0]
-        if (cmd & 0x80) == 0 and (cmd & ENC_INC) != ENC_INC:
+        if (cmd & 0x80) == 0 and (cmd & 0xF0) != ENC_INC:
             value = cmd+ENC_LIT_MIN
             # verbatim
             if enc_poppable(output[i-1]) and value >= 2:
@@ -142,15 +156,15 @@ def improve_compression(output):
                 b = output[i-1][1][1]
                 c = output[i][1][0]
                 if a+1 == b and b+1 == c:
-                    output[i-1][0] = ENC_INC
+                    output[i-1][0] = ENC_INC + 1
                     del output[i-1][1][1]
-                    output[i][0] = ENC_INC + 1
+                    output[i][0] = ENC_INC + 2
                     output[i][1][0] = output[i-1][1][0]
             # those are usually not found because this length could interrupt LITs
             # we lack knowledge during parsing
             elif args.increment_compression == "yes" and value == 2 and output[i][1][0]+1 == output[i][1][1]:
                 # LIT A B -> INC A
-                output[i][0] = ENC_INC
+                output[i][0] = ENC_INC + 1
                 del output[i][1][1]
         i += 1
     return output
@@ -421,9 +435,7 @@ def compress_rle(data):
         print("Unoptimized compression: 0x{0:02X} bytes".format(datasize))
     # save even more bytes
     # from decompnessor view it’s free
-    # TODO: enable again
-    # TODO: make it undersstand new format
-    ##output = improve_compression(output)
+    output = improve_compression(output)
     # flatten output
     #print(output)
 
