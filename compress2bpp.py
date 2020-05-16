@@ -61,12 +61,12 @@ def enc_pop(encoding_pair):
             return [encoding_pair[1][-1]], [cmd-1, encoding_pair[1][:-1]]
     if (cmd & 0xE0) == ENC_ROW:
         value = (cmd & 0xE) >> 1
-        byte1 = "0xFF"
-        byte2 = "0xFF"
+        byte1 = 0xFF
+        byte2 = 0xFF
         if (cmd & 0x10) == 0: #TODO: invert format at some point
-            byte1 = "0x00"
+            byte1 = 0x00
         if (cmd & 0x1) == 0:
-            byte2 = "0x00"
+            byte2 = 0x00
         if value == 0:
             return [byte1, byte2], []
         else:
@@ -171,13 +171,13 @@ def improve_compression(output):
 
 # helper function for compress_rle
 def flush_verbatim(verbatim, output, datasize):
-    if(args.color_line_compression == "yes" and len(verbatim) == 2 and (verbatim[0] == '0xFF' or verbatim[0] == '0x00') and (verbatim[1] == '0xFF' or verbatim[1] == '0x00')):
+    if(args.color_line_compression == "yes" and len(verbatim) == 2 and (verbatim[0] == 0xFF or verbatim[0] == 0x00) and (verbatim[1] == 0xFF or verbatim[1] == 0x00)):
         # 1 byte instead of 3
         h = 0x0
         l = 0x0
-        if verbatim[0] == '0xFF':
+        if verbatim[0] == 0xFF:
             h = 0x10
-        if verbatim[1] == '0xFF':
+        if verbatim[1] == 0xFF:
             l = 0x01
         output.append([ENC_ROW | h | l | 0,[]])
         datasize += 1
@@ -321,12 +321,12 @@ def compress_rle(data):
                     counter -= 1
                     append = True
                 if(counter > 1):
-                    if args.color_line_compression == "yes" and  counter <= 8 and (data[i-2] == '0xFF' or data[i-2] == '0x00') and (data[i-1] == '0xFF' or data[i-1] == '0x00'):
+                    if args.color_line_compression == "yes" and  counter <= 8 and (data[i-2] == 0xFF or data[i-2] == 0x00) and (data[i-1] == 0xFF or data[i-1] == 0x00):
                         h = 0x0
                         l = 0x0
-                        if data[i-2] == '0xFF':
+                        if data[i-2] == 0xFF:
                             h = 0x10
-                        if data[i-1] == '0xFF':
+                        if data[i-1] == 0xFF:
                             l = 0x01
                         output.append([ENC_ROW | h | l | (int(counter)-1)<<1,[]])
                         datasize += 1
@@ -364,9 +364,9 @@ def compress_rle(data):
         elif counter > 1:
             # run just ended
             if mode == 0:
-                if args.color_line_compression == "yes" and (counter <= 8*2 and counter%2 == 0 and (data[i-1] == '0xFF' or data[i-1] == '0x00')):
+                if args.color_line_compression == "yes" and (counter <= 8*2 and counter%2 == 0 and (data[i-1] == 0xFF or data[i-1] == 0x00)):
                     hl = 0x0
-                    if data[i-1] == '0xFF':
+                    if data[i-1] == 0xFF:
                         hl = 0x11
                     output.append([ENC_ROW | hl | (int(counter/2)-1)<<1, []])
                     datasize += 1
@@ -374,12 +374,12 @@ def compress_rle(data):
                     output.append([ENC_RUN | (counter-ENC_RUN_MIN),[data[i-1]]])
                     datasize += 2
             elif mode == 1:
-                if args.color_line_compression == "yes" and  counter <= 8 and (data[i-2] == '0xFF' or data[i-2] == '0x00') and (data[i-1] == '0xFF' or data[i-1] == '0x00'):
+                if args.color_line_compression == "yes" and  counter <= 8 and (data[i-2] == 0xFF or data[i-2] == 0x00) and (data[i-1] == 0xFF or data[i-1] == 0x00):
                     h = 0x0
                     l = 0x0
-                    if data[i-2] == '0xFF':
+                    if data[i-2] == 0xFF:
                         h = 0x10
-                    if data[i-1] == '0xFF':
+                    if data[i-1] == 0xFF:
                         l = 0x01
                     output.append([ENC_ROW | h | l | (int(counter)-1)<<1,[]])
                     datasize += 1

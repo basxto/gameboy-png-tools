@@ -91,17 +91,17 @@ unsigned char* set_bkg_data_rle(UINT8 first_tile, UINT8 nb_tiles, const unsigned
                 continue;
             }
             if((cmd&0x40) == 0){
-                ++value;
                 if((cmd&$(0x20))==0){//RUN
                     byte1 = *(++data);
                     byte2 = byte1;
+                    ++value;
 #ifndef NOCOLORLINE
                 }else{//ROW
                     UINT8 tmp0 = $(0x00);
                     UINT8 tmpF = $(0xFF);
                     byte1 = (value & $(0x10) ? tmpF : tmp0);
                     byte2 = (value & $(0x01) ? tmpF : tmp0);
-                    value = (value&$(0xE)) + (ENC_ROW_MIN*$(2)) - $(1);
+                    value = (value&$(0xE)) + (ENC_ROW_MIN*$(2));
 #endif
                 }
             }else{
