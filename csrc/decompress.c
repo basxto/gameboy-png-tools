@@ -97,10 +97,18 @@ unsigned char* set_bkg_data_rle(UINT8 first_tile, UINT8 nb_tiles, const unsigned
                     ++value;
 #ifndef NOCOLORLINE
                 }else{//ROW
-                    UINT8 tmp0 = $(0x00);
+                    // 0x00-1=0xFF 0x01-1=0x00
+                    byte1 = ((value>>4)&0x1)-$(1);
+                    byte2 = (value&0x1)-$(1);
+                    /*UINT8 tmp = (value & $(0x11));
+                    byte1 = ($(tmp&0xFE)>>4)-$(1);
+                    //byte1 = ($(tmp>>4)-$(1);
+                    //tmp&=0xEF;
+                    byte2 = (tmp&0xEF)-$(1);*/
+                    /*UINT8 tmp0 = $(0x00);
                     UINT8 tmpF = $(0xFF);
-                    byte1 = (value & $(0x10) ? tmpF : tmp0);
-                    byte2 = (value & $(0x01) ? tmpF : tmp0);
+                    byte1 = (value & $(0x10) ? tmp0 : tmpF);
+                    byte2 = (value & $(0x01) ? tmp0 : tmpF);*/
                     value = (value&$(0xE)) + (ENC_ROW_MIN*$(2));
 #endif
                 }

@@ -1,0 +1,105 @@
+; must be all in one file
+
+replace {
+ ; redundant AND
+ and	a, #0x10
+ swap	a
+ and	a, #0x0f
+} by {
+ and	a, #0x10;2b 2c saved
+ swap	a	
+}
+
+replace {
+ ; redundant AND
+ and	a, #0x0f
+ and	a, #0x01
+} by {
+ and	a, #0x01;2b 2c saved
+}
+
+
+
+replace {
+ ; ld	a, (hl+/-) is faster
+ ld	%2, (hl)
+ inc	hl
+ ld	%1, (hl)
+ dec	%1%2
+ dec	hl
+} by {
+ ld	a, (hl+);1b 2c
+ ld	%2, a	;1b 1c
+ ld	a, (hl-);1b 2c
+ ld	%1, a	;1b 1c
+ dec	%1%2	;1b 2c
+} if canAssign('a' 'a')
+
+replace {
+ ; ld	a, (hl+/-) is faster
+ ld	%1, (hl)
+ dec	hl
+} by {
+ ld	a, (hl-);1b 2c
+ ld	%1, a	;1b 1c
+} if canAssign('a' 'a')
+
+replace {
+ ; ld	a, (hl+/-) is faster
+ ld	%1, (hl)
+ inc	hl
+} by {
+ ld	a, (hl+);1b 2c
+ ld	%1, a	;1b 1c
+} if canAssign('a' 'a')
+
+
+
+
+replace {
+ ; 16bit <<4
+ ld	  %1, (hl)
+ ld	  %2, #0x00
+ sla  %1
+ rl   %2
+ sla  %1
+ rl   %2
+ sla  %1
+ rl   %2
+ sla  %1
+ rl   %2
+} by {
+ ld   a, (hl)	; no backup needed
+ swap a
+ ld   %1, a
+ and  a, #0x0F
+ ld   %2, a
+ ld   a, %1
+ and  a, #0xF0
+ ld   %1, a
+} if canAssign('a' 'a')
+
+replace {
+ ; 16bit <<4
+ ld	  %1, (hl)
+ ld	  %2, #0x00
+ sla  %1
+ rl   %2
+ sla  %1
+ rl   %2
+ sla  %1
+ rl   %2
+ sla  %1
+ rl   %2
+} by {
+ push af ; backup
+ ld   a, (hl)
+ swap a
+ ld   %1, a
+ and  a, #0x0F
+ ld   %2, a
+ ld   a, %1
+ and  a, #0xF0
+ ld   %1, a
+ pop  af ; restore
+}
