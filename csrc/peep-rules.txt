@@ -1,4 +1,5 @@
 ; must be all in one file
+; more info https://sourceforge.net/p/sdcc/code/HEAD/tree/trunk/sdcc/src/SDCCpeeph.c
 
 replace {
  ; redundant AND
@@ -33,7 +34,7 @@ replace {
  ld	a, (hl-);1b 2c
  ld	%1, a	;1b 1c
  dec	%1%2	;1b 2c
-} if canAssign('a' 'a')
+} if canAssign(%2 'a'), canAssign(%1 'a'), notUsed('a')
 
 replace {
  ; ld	a, (hl+/-) is faster
@@ -42,7 +43,7 @@ replace {
 } by {
  ld	a, (hl-);1b 2c
  ld	%1, a	;1b 1c
-} if canAssign('a' 'a')
+} if canAssign(%1 'a'), notUsed('a')
 
 replace {
  ; ld	a, (hl+/-) is faster
@@ -51,7 +52,7 @@ replace {
 } by {
  ld	a, (hl+);1b 2c
  ld	%1, a	;1b 1c
-} if canAssign('a' 'a')
+} if canAssign(%1 'a'), notUsed('a')
 
 
 
@@ -72,12 +73,12 @@ replace {
  ld   a, (hl)	; no backup needed
  swap a
  ld   %1, a
- and  a, #0x0F
+ and  a, #0x0f
  ld   %2, a
  ld   a, %1
- and  a, #0xF0
+ and  a, #0xf0
  ld   %1, a
-} if canAssign('a' 'a')
+} if canAssign(%2 'a'), canAssign(%1 'a'), canAssign('a' %1), notUsed('a')
 
 replace {
  ; 16bit <<4
@@ -96,10 +97,10 @@ replace {
  ld   a, (hl)
  swap a
  ld   %1, a
- and  a, #0x0F
+ and  a, #0x0f
  ld   %2, a
  ld   a, %1
- and  a, #0xF0
+ and  a, #0xf0
  ld   %1, a
  pop  af ; restore
-}
+} if canAssign(%2 'a'), canAssign(%1 'a'), canAssign('a' %1)
