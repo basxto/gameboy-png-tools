@@ -63,7 +63,7 @@ def enc_pop(encoding_pair):
         value = (cmd & 0xE) >> 1
         byte1 = 0x00
         byte2 = 0x00
-        if (cmd & 0x10) == 0: #TODO: invert format at some point
+        if (cmd & 0x10) == 0:
             byte1 = 0xFF
         if (cmd & 0x1) == 0:
             byte2 = 0xFF
@@ -207,14 +207,14 @@ ENC_ALT_MAX = ENC_ALT_MIN+30
 ENC_EOD = 0x00 # 0
 ENC_MON = 0x80 # 0
 
-#newest idea:
+#current:
 # command bytes with size, values
 # and outputed bytes per value
 #
 # 0x 0b       NAME SIZE  OUT VALUES
 ####################################
 # 00 00000000 EOD [ 1B ] 0B  1
-# 00 0000XXXX INC [ 2B ] 1B  2-(17-1)       // don't forget in decompressor that this lost one
+# 00 0000XXXX INC [ 2B ] 1B  2-(17-1)
 # 00 0XXXXXXX LIT [1B+n] 1B  1-(128-15)
 # 80 10000000 MON [ 1B ] 0B  1
 # 80 100XXXXX RUN [ 2B ] 1B  2-(33-1)
@@ -246,18 +246,6 @@ ENC_MON = 0x80 # 0
 # 80 10XXXXXX RUN
 # C0 11XXXXX0 INV
 # E0 11XXXXX1 ALT
-
-
-# current:
-# 2 bytes don’t have to be repeated more than 16 times (2 tiles)
-# one byte doesn’t have to run more than 32 times (2 tiles)
-# 00 0XXXXXXX - write through the next X bytes (127+1-15) [1 + n bytes]
-# 70 0111XXXX - run next byte X times incrementing it each time (15+2) - map compression [2 bytes]
-# 80 100XXXXX - run next byte X times (31+2) - highest and lowest color only [2 bytes]
-# A0 101XXXXX - run next byte X*2 times alternating normal and inverted  (31+2) - middle colors only [2 bytes]
-# C0 110HLXXX - High Low colored line X times (7+1) [1 byte]
-# E0 111XXXXX - run next 2 bytes X times alternating (30+2) [3 bytes]
-# FF 11111111 - end of data [1 byte]
 
 # 1101 1111 represents 8 times 0xFF 0xFF, which are 16 bytes / one tile
 

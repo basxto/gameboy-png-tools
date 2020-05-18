@@ -38,13 +38,17 @@ unsigned char decompress_map_buffer[0xFF];
 
 // 2 bytes don’t have to be repeated more than 16 times (2 tiles)
 // one byte doesn’t have to run more than 32 times (2 tiles)
-// 00 0XXXXXXX - write through the next X bytes (127+1)
-// 70 0111XXXX - run next byte X times incrementing it each time (15+2) - map compression
-// 80 100XXXXX - run next byte X*2 times (31+2) - highest and lowest color only
-// A0 101XXXXX - run next byte X times alternating normal and inverted  (31+2) - middle colors only
-// C0 110HLXXX - High Low colored line X times (7+1)
-// E0 111XXXXX - run next 2 bytes X times alternating (30+2)
-// FF 11111111 - end of data
+
+// 0x 0b       NAME SIZE  OUT VALUES
+//###################################
+// 00 00000000 EOD [ 1B ] 0B  1
+// 00 0000XXXX INC [ 2B ] 1B  2-(17-1)
+// 00 0XXXXXXX LIT [1B+n] 1B  1-(128-15)
+// 80 10000000 MON [ 1B ] 0B  1
+// 80 100XXXXX RUN [ 2B ] 1B  2-(33-1)
+// A0 101HXXXL ROW [ 1B ] 2B  1-8
+// C0 11XXXXX0 INV [ 2B ] 2B  2-33
+// E0 11XXXXX1 ALT [ 3B ] 2B  2-33
 
 // this can't load into sprite VRAM < index 128
 unsigned char* set_bkg_data_rle(UINT8 first_tile, UINT8 nb_tiles, const unsigned char *data, UINT8 skip_tiles) NONBANKED{
@@ -73,16 +77,16 @@ unsigned char* set_bkg_data_rle(UINT8 first_tile, UINT8 nb_tiles, const unsigned
         cmd = value;
         if((cmd & $(0x80)) == 0){
             cmd = 0;
-            ++value;
 #ifndef NOINCREMENTER
             if((value & $(0xF0)) == ENC_INC){
                 // incremental sequence
+                ++value;
                 ++cmd;
                 byte1 = *(++data);
             }else
 #endif
                 //verbatim
-                value= $(value-1 + ENC_LIT_MIN);
+                value= $(value + ENC_LIT_MIN);
         }else{
             value &= 0x7F;// remove leading 1
             if(value == 0){//switch monochrome mode
@@ -100,15 +104,6 @@ unsigned char* set_bkg_data_rle(UINT8 first_tile, UINT8 nb_tiles, const unsigned
                     // 0x00-1=0xFF 0x01-1=0x00
                     byte1 = ((value>>4)&0x1)-$(1);
                     byte2 = (value&0x1)-$(1);
-                    /*UINT8 tmp = (value & $(0x11));
-                    byte1 = ($(tmp&0xFE)>>4)-$(1);
-                    //byte1 = ($(tmp>>4)-$(1);
-                    //tmp&=0xEF;
-                    byte2 = (tmp&0xEF)-$(1);*/
-                    /*UINT8 tmp0 = $(0x00);
-                    UINT8 tmpF = $(0xFF);
-                    byte1 = (value & $(0x10) ? tmp0 : tmpF);
-                    byte2 = (value & $(0x01) ? tmp0 : tmpF);*/
                     value = (value&$(0xE)) + (ENC_ROW_MIN*$(2));
 #endif
                 }
