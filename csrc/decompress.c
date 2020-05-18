@@ -55,7 +55,7 @@ unsigned char* set_bkg_data_rle(UINT8 first_tile, UINT8 nb_tiles, const unsigned
     // max 0x0FF0
     UINT16 skip_bytes = skip_tiles*$(16);
     unsigned char* dectbuf = decompress_tile_buffer;
-    UINT8 cmd, value, byte1, byte2;
+    UINT8 cmd, value, byte1, byte2 = 0;
     _Bool monochrome = 0;
     // allows faster *(++data) in loop
     --data;
@@ -74,9 +74,9 @@ unsigned char* set_bkg_data_rle(UINT8 first_tile, UINT8 nb_tiles, const unsigned
             goto ret;
         }
 #endif
-        cmd = value;
-        if((cmd & $(0x80)) == 0){
-            cmd = 0;
+        cmd &= 0x80;
+        if((value & $(0x80)) == 0){
+            //cmd = 0;
 #ifndef NOINCREMENTER
             if((value & $(0xF0)) == ENC_INC){
                 // incremental sequence
@@ -94,8 +94,8 @@ unsigned char* set_bkg_data_rle(UINT8 first_tile, UINT8 nb_tiles, const unsigned
                 skip_bytes = (monochrome? skip_bytes>>1 : skip_bytes<<1);
                 continue;
             }
-            if((cmd&0x40) == 0){
-                if((cmd&$(0x20))==0){//RUN
+            if((value&0x40) == 0){
+                if((value&$(0x20))==0){//RUN
                     byte1 = *(++data);
                     byte2 = byte1;
                     ++value;
@@ -108,12 +108,12 @@ unsigned char* set_bkg_data_rle(UINT8 first_tile, UINT8 nb_tiles, const unsigned
 #endif
                 }
             }else{
-                value = (value&$(0xBE))+$(4);
                 byte1 = *(++data);
                 byte2 = ~byte1;//INV
-                if((cmd&$(0x1))!=0){//ALT
+                if((value&$(0x1))!=0){//ALT
                     byte2 = *(++data);
                 }
+                value = (value&$(0xBE))+$(4);
             }
             cmd = 4;
         }
