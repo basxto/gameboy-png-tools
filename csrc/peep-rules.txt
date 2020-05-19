@@ -38,6 +38,13 @@ replace {
 
 replace {
  ; ld	a, (hl+/-) is faster
+ ld	a, (hl)
+ dec	hl
+} by {
+ ld	a, (hl-);save 1b 2c
+}
+
+replace {
  ld	%1, (hl)
  dec	hl
 } by {
@@ -46,13 +53,50 @@ replace {
 } if canAssign(%1 'a'), notUsed('a')
 
 replace {
- ; ld	a, (hl+/-) is faster
+ ld	a, (hl)
+ inc	hl
+} by {
+ ld	a, (hl+);save 1b 2c
+}
+
+replace {
  ld	%1, (hl)
  inc	hl
 } by {
  ld	a, (hl+);1b 2c
  ld	%1, a	;1b 1c
 } if canAssign(%1 'a'), notUsed('a')
+
+replace {
+ ; ld	a, (hl+/-) is faster
+ ld	(hl), a
+ dec	hl
+} by {
+ ld	(hl-), a;save 1b 2c
+}
+
+replace {
+ ld	(hl), %1
+ dec	hl
+} by {
+ ld	a, %1	;1b 1c
+ ld	(hl-), a;1b 2c
+} if canAssign('a' %1), notUsed('a')
+
+replace {
+ ld	(hl), a
+ inc	hl
+} by {
+ ld	(hl+), a;save 1b 2c
+}
+
+replace {
+ ld	(hl), %1
+ inc	hl
+} by {
+ ld	a, %1	;1b 1c
+ ld	(hl+), a;1b 2c
+} if canAssign('a' %1), notUsed('a')
 
 
 
