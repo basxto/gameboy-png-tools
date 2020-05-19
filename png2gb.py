@@ -24,6 +24,7 @@ def convert_tile(x, y, pixel):
     return tile
 
 def convert_image(width, height, filebase, pixel, d, m):
+    global args
     global mapper
     global mapcounter
     global mapsize
@@ -41,12 +42,19 @@ def convert_image(width, height, filebase, pixel, d, m):
                     # subx and suby go top to bottom and then left to right
                     tile = convert_tile(x*args.width+subx, y*args.height+suby, pixel)
                     tilestr = ",".join(map(str,tile))
+                    # mirror tile horizontally (bitwise)
+                    mh_tilestr = ",".join(map(lambda x: str(int('{:08b}'.format(x)[::-1], 2)),tile))
                     if compress and (tilestr in mapper):
                         # use existing tile
                         if(mapcounter < args.limit):
                             #dmap += "0x{0:02X}, ".format(mapper[tile][0])
                             dmap.append(mapper[tilestr][0])
                             mapper[tilestr][1] += 1 # count occurences
+                    elif compress and mirror and (mh_tilestr in mapper):
+                        # use existing tile
+                        if(mapcounter < args.limit):
+                            dmap.append(0x80 | mapper[mh_tilestr][0])
+                            mapper[mh_tilestr][1] += 1
                     else:
                         # add new tile
                         if(mapcounter < args.limit):
@@ -99,6 +107,8 @@ def convert_palette(palette, filebase, p):
 def main():
     global compress
     compress = True
+    global mirror
+    mirror = False
     # for tile  mapping
     global mapper
     mapper = dict()
@@ -131,11 +141,14 @@ def main():
     parser.add_argument("--c-include", "-c", default="no", help="Output c source instead of binary files (default: no)")
     parser.add_argument("--verbose", "-v", default="no", help="Tell which files got written (default: no)")
     parser.add_argument("--binary", "-b", default="no", help="Pipe output binary (default: no)")
+    parser.add_argument("--flip-horizontally", "-f", default="no", help="Mirror tiles horizontally during deduplication; 0x80 marks flipped tiles (default: no)")
     global args
 
     args = parser.parse_args()
     if args.uncompressed != "no":
         compress = False
+    if args.flip_horizontally != "no":
+        mirror = True
 
     if args.image[0] != "-":
         for filename in args.image:
