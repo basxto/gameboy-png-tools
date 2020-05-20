@@ -74,7 +74,7 @@ unsigned char* set_bkg_data_rle(UINT8 first_tile, UINT8 nb_tiles, const unsigned
             goto ret;
         }
 #endif
-        cmd &= 0x80;
+        cmd = 0;
         if((value & $(0x80)) == 0){
             //cmd = 0;
 #ifndef NOINCREMENTER
