@@ -4,7 +4,7 @@ BIN=$(DEV)/gbdk-n/bin
 LK?=$(BIN)/gbdk-n-link.sh -Wl-m
 CC=$(BIN)/gbdk-n-compile.sh -Wa-l
 MKROM?=$(BIN)/gbdk-n-make-rom.sh
-CFLAGS += --peep-file csrc/peep-rules.txt
+CFLAGS += --peep-file $(abspath $(DEV))/gbz80-ph/peep-rules.txt
 
 ROM=png2gb
 
