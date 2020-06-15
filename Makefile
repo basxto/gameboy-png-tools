@@ -1,9 +1,9 @@
 DEV?=./dev
-BIN=$(DEV)/gbdk-n/bin
 
-LK?=$(BIN)/gbdk-n-link.sh -Wl-m
-CC=$(BIN)/gbdk-n-compile.sh -Wa-l
-MKROM?=$(BIN)/gbdk-n-make-rom.sh
+# globally installed
+LCC?=lcc -Wa-l -Wl-m -Wl-j
+CC=$(LCC) -c 
+MKROM?=$(LCC)
 CFLAGS += --peep-file csrc/peep-rules.txt
 
 ROM=png2gb
@@ -15,23 +15,14 @@ build: $(ROM).gb
 test:
 	./test/test_all.sh
 
-$(ROM).gb: main.ihx
-	$(MKROM) $< $@
+$(ROM).gb: main.rel csrc/decompress.rel
+	$(MKROM) -o $@ $^
 
-$(ROM)_noc.gb: main_noc.ihx
-	$(MKROM) $< $@
-
-main.ihx: main.rel csrc/decompress.rel
-	$(LK) -o $@ $^
-
-main_noc.ihx: main.rel
-	$(LK) -o $@ $^
+$(ROM)_noc.gb: main.rel
+	$(MKROM) -o $@ $^
 
 %.rel: %.c
 	$(CC) $(CFLAGS) -o $@ $^
-
-gbdk-n:
-	$(MAKE) -C $(DEV)/gbdk-n
 
 clean:
 	find . -maxdepth 2 -type f -regex '.*.\(gb\|o\|map\|lst\|sym\|rel\|ihx\|lk\|noi\|asm\|adb\|cdb\|bi4\)' -delete

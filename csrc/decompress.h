@@ -1,14 +1,14 @@
 #ifndef decompress_h
 #define decompress_h
 
-#ifdef __SDCC
+//#ifdef __SDCC
 // we substitute this when we test
 #include <gb/gb.h>
-#endif
-#if !defined __SDCC || __SDCC_VERSION_MAJOR == 0
+//#endif
+//#if !defined __SDCC || __SDCC_VERSION_MAJOR == 0
 // fix testing and IDE code analyzer
-#define NONBANKED
-#endif
+//#define NONBANKED
+//#endif
 
 
 #define set_bkg_data_rle set_win_data_rle
