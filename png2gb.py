@@ -35,8 +35,8 @@ def convert_image(width, height, filebase, pixel, d, m):
 
     data = []
     dmap = []
-    for y in range(0, (int)(height/(8*args.height))):
-        for x in range(0, (int)(width/(8*args.width))):
+    for x in range(0, (int)(width/(8*args.width))):
+        for y in range(0, (int)(height/(8*args.height))):
             for subx in range(0, args.width):
                 for suby in range(0, args.height):
                     # subx and suby go top to bottom and then left to right
@@ -227,7 +227,7 @@ def main():
                 print("Read from {0}...".format("stdin"), file=sys.stderr)
         original = r.read()
 
-        if original[0]%(8*args.height) != 0 or original[1]%(8*args.width) != 0:
+        if original[0]%(8*args.width) != 0 or original[1]%(8*args.height) != 0:
             print("Image height must be a multiple of {0}".format(8*args.height), file=sys.stderr)
             print("Image width must be a multiple of {0}".format(8*args.width), file=sys.stderr)
             exit(2)
