@@ -17,8 +17,9 @@ def convert_tile(data):
     tile=[]
     for suby in range(0, 8):
         tile.append([])
-        hibyte=data[index+1]
-        lobyte=data[index]
+        # invert with ^0xFF for palette compatibility with png2gb
+        hibyte=data[index+1] ^ 0xFF
+        lobyte=data[index] ^ 0xFF
         for subx in range(0, 8):
             pxl = ((hibyte>>(7-subx))&0x1) << 1
             pxl |= (lobyte>>(7-subx))&0x1
@@ -111,7 +112,7 @@ def main():
 
     s = convert_image(data)
 
-    palette = [(0xc4,0xcf,0xa1),(0x8b,0x95,0x6d),(0x4d,0x53,0x3c),(0x1f,0x1f,0x1f)]
+    palette = [(0x1f,0x1f,0x1f),(0x4d,0x53,0x3c),(0x8b,0x95,0x6d),(0xc4,0xcf,0xa1)]
     w = png.Writer(len(s[0]), len(s), palette=palette, bitdepth=2)
     f = open(args.output, 'wb')
     w.write(f, s)
