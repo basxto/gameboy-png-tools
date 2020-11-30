@@ -35,8 +35,8 @@ def convert_image(width, height, filebase, pixel, d, m):
 
     data = []
     dmap = []
-    for x in range(0, (int)(width/(8*args.width))):
-        for y in range(0, (int)(height/(8*args.height))):
+    for y in range(0, (int)(height/(8*args.height))):
+        for x in range(0, (int)(width/(8*args.width))):
             for subx in range(0, args.width):
                 for suby in range(0, args.height):
                     # subx and suby go top to bottom and then left to right
