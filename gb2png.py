@@ -28,31 +28,42 @@ def convert_tile(data):
     return tile
 
 def convert_image(data):
+    mapper = []
+    global tilemap
     image = []
     index = 0
     while len(data) != 0:
         tile = convert_tile(data)
+        mapper.append(tile)
+        # 16 byte per tile
+        data = data[16:]
+    # generate white tile
+    white=[]
+    for suby in range(0, 8):
+        white.append([])
+        for subx in range(0, 8):
+            white[suby].append(3)
+    mapper.append(white)
+    white = len(mapper)-1
+
+    # generate tilemap if there is none
+    if len(tilemap) == 0:
+        for i in range(white):
+            tilemap.append(i)
+
+    # fill with whiteness
+    while len(tilemap)%args.width != 0:
+        tilemap.append(white)
+
+    for tile_index in tilemap:
+        tile = mapper[tile_index]
         if index == 0:
             for y in range(0, 8):
                 image.append(tile[y])
         else:
             for y in range(0, 8):
                 image[y-8]+=tile[y]
-        # 16 byte per tile
-        data = data[16:]
-        # 16 tiles per row
-        index=(index+1)%args.width
-    # generate white tile
-    white=[]
-    for suby in range(0, 8):
-        white.append([])
-        for subx in range(0, 8):
-            white[suby].append(0)
-    # fill with whiteness
-    while index != 0:
-        for y in range(0, 8):
-            image[y-8]+=white[y]
-        # 16 tiles per row
+        # <width> tiles per row
         index=(index+1)%args.width
     return image
 
@@ -66,6 +77,8 @@ def mono2color(data):
 
 def main():
     global mirror
+    global tilemap
+    tilemap = []
     mirror = False
     outbase = 'unnamed'
 
