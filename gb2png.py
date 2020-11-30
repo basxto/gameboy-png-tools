@@ -1,7 +1,7 @@
 #!/bin/env python3
 # Convert gameboy images to indexed png
 # Used palette is https://lospec.com/palette-list/dirtyboy
-# This needs https://github.com/drj11/pypng
+# This needs https://github.com/drj61/pypng
 import png
 import re
 import argparse
@@ -40,7 +40,7 @@ def convert_image(data):
         # 16 byte per tile
         data = data[16:]
         # 16 tiles per row
-        index=(index+1)%16
+        index=(index+1)%args.width
     # generate white tile
     white=[]
     for suby in range(0, 8):
@@ -52,7 +52,7 @@ def convert_image(data):
         for y in range(0, 8):
             image[y-8]+=white[y]
         # 16 tiles per row
-        index=(index+1)%16
+        index=(index+1)%args.width
     return image
 
 def mono2color(data):
@@ -73,7 +73,7 @@ def main():
     parser.add_argument("--output", "-o", default="", help="Output image (default: image_gb.png)")
     parser.add_argument("--monochrome", "-m", default="no", help="1bpp mode (default: no)")
     parser.add_argument("--tilemap", "-t", default="", help="Tilemap file, '' gets treated as disabled [unsupported]")
-    parser.add_argument("--width", type=int, default=1, help="Meta tile width (default: 1) [unsupported]")
+    parser.add_argument("--width", type=int, default=16, help="Meta tile width (default: 16)")
     parser.add_argument("--height", type=int, default=1, help="Meta tile height (default: 1) [unsupported]")
     parser.add_argument("--flip-horizontally", "-f", default="no", help="0x80 marks flipped tiles (default: no) [unsupported]")
     global args
