@@ -86,14 +86,14 @@ def convert_palette(palette, filebase, p):
     pal = []
     subpal = []
     for color in palette:
+        r = int((color[0]&0xFF)/8)
+        g = int((color[1]&0xFF)/8)
+        b = int((color[2]&0xFF)/8)
         if args.c_include != "no":
-            subpal = ["RGB({0}, {1}, {2})".format((int)(color[0]/8), (int)(color[1]/8), (int)(color[2]/8))] + subpal
+            subpal = ["RGB({0}, {1}, {2})".format(r, g, b)] + subpal
         else:
-            r = int(color[0]/8)
-            g = int(color[1]/8)
-            b = int(color[2]/8)
-            rgb555 = r<<10 | g<<5 | b
-            subpal = [rgb555>>8, rgb555&0xFF] + subpal
+            bgr555 = b<<10 | g<<5 | r
+            subpal = [bgr555>>8, bgr555&0xFF] + subpal
         counter += 1
         if counter == 4:
             counter = 0
