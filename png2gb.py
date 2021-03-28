@@ -93,7 +93,7 @@ def convert_palette(palette, filebase, p):
             subpal = ["RGB({0}, {1}, {2})".format(r, g, b)] + subpal
         else:
             bgr555 = b<<10 | g<<5 | r
-            subpal = [bgr555>>8, bgr555&0xFF] + subpal
+            subpal = [bgr555&0xFF, bgr555>>8] + subpal
         counter += 1
         if counter == 4:
             counter = 0
