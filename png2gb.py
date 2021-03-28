@@ -183,10 +183,9 @@ def main():
         print("You need to specify an output file if you read from stdin", file=sys.stderr)
         exit(1)
 
-    #d = open(outbase + '_data.c', 'w')
     d = sys.stdout
-    m = open(outbase + '_map.c', 'w')
-    p = open(outbase + '_pal.c', 'w')
+    m = None
+    p = None
     if args.c_include != "no":
         if args.binary == "no":
             if args.output != "-":
@@ -201,6 +200,8 @@ def main():
                 d.write("__at ({0}) ".format(args.datarom))
             d.write("const unsigned char {0}_data[] = ".format(os.path.basename(outbase))+"{\n")
         if not (args.output == "-" and args.image[0] == "-"):
+            m = open(outbase + '_map.c', 'w')
+            p = open(outbase + '_pal.c', 'w')
             if args.verbose != "no":
                 print("Write to {0}...".format(outbase + '_map.c'), file=sys.stderr)
                 print("Write to {0}...".format(outbase + '_pal.c'), file=sys.stderr)
@@ -266,8 +267,6 @@ def main():
             p.write("\n},{\n\t".join(map(", ".join,palbuffer)))
             p.write("\n}};\n")
     else:
-        m.close()
-        p.close()
         if args.output != "-":
             d = open(outbase + '.2bpp', 'wb')
             if args.verbose != "no":
